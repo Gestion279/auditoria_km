@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Auditoría de km</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231E2A36'/><rect x='6' y='9' width='14' height='3' fill='%23D19A3A'/><rect x='6' y='15' width='20' height='3' fill='%235B9BD5'/><rect x='6' y='21' width='17' height='3' fill='%2334A88A'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&display=swap" rel="stylesheet">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  color-scheme: light;
+  --paper:#EEF1F3; --surface:#FFFFFF; --sunken:#E3E8EC;
+  --ink:#1E2A36; --ink-2:#4A5866; --ink-3:#7A8794; --rule:#CDD5DC;
+  --gv:#A8701A; --gps:#2D6CA8; --ypf:#17806A;
+  --bad:#B83A2B; --bad-bg:#F6E1DD; --warn:#9A6A00; --warn-bg:#F6ECD2;
+  --ok:#3F7444; --ok-bg:#E2EEDF; --mute-bg:#E8ECEF;
+  --focus:#2D6CA8;
+  --font:"Archivo", "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --paper:#131A21; --surface:#1B242D; --sunken:#232E38;
+    --ink:#E4E9ED; --ink-2:#B3BEC8; --ink-3:#86939F; --rule:#33404C;
+    --gv:#D19A3A; --gps:#5B9BD5; --ypf:#34A88A;
+    --bad:#E0715F; --bad-bg:#3A2420; --warn:#D9A93F; --warn-bg:#352C17;
+    --ok:#7FB585; --ok-bg:#1F3022; --mute-bg:#232E38; --focus:#5B9BD5;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --paper:#131A21; --surface:#1B242D; --sunken:#232E38;
+  --ink:#E4E9ED; --ink-2:#B3BEC8; --ink-3:#86939F; --rule:#33404C;
+  --gv:#D19A3A; --gps:#5B9BD5; --ypf:#34A88A;
+  --bad:#E0715F; --bad-bg:#3A2420; --warn:#D9A93F; --warn-bg:#352C17;
+  --ok:#7FB585; --ok-bg:#1F3022; --mute-bg:#232E38; --focus:#5B9BD5;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.45}
+body{padding-bottom:env(safe-area-inset-bottom,0px)}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.wrap{max-width:1440px;margin:0 auto;padding:0 20px}
+
+/* Encabezado */
+header.top{padding:calc(18px + env(safe-area-inset-top,0px)) 0 14px;border-bottom:1px solid var(--rule);background:var(--surface)}
+header.top .wrap{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+h1{margin:0;font-size:30px;font-weight:700;font-stretch:72%;letter-spacing:.2px;line-height:1}
+.subtitle{margin:6px 0 0;color:var(--ink-2);font-size:14px}
+.conn{font-size:13px;color:var(--ink-3);display:flex;gap:10px;align-items:center}
+.conn .dot{width:8px;height:8px;border-radius:50%;background:var(--ink-3);display:inline-block}
+.conn.ok .dot{background:var(--ok)} .conn.err .dot{background:var(--bad)}
+.linkbtn{background:none;border:0;padding:0;color:var(--gps);cursor:pointer;text-decoration:underline;font-size:13px}
+
+/* Filtros */
+.filters{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;padding:14px 0}
+.f{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--ink-2)}
+.f select,.f input[type=search],.f input[type=month]{height:36px;border:1px solid var(--rule);background:var(--surface);border-radius:4px;padding:0 10px;min-width:120px}
+.f input[type=search]{min-width:170px}
+.f.tol output{font-weight:600;color:var(--ink)}
+.f input[type=range]{width:140px;accent-color:var(--ink)}
+.chk{display:flex;align-items:center;gap:6px;font-size:13.5px;color:var(--ink);height:36px}
+.btn{height:36px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:4px;padding:0 14px;cursor:pointer;font-weight:600}
+.btn.ghost{background:transparent;color:var(--ink)}
+.spacer{flex:1}
+
+/* Resumen: tres carriles */
+.summary{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:28px;padding:18px 0 22px;border-bottom:1px solid var(--rule)}
+.lanes{display:flex;flex-direction:column;gap:10px}
+.lane{display:grid;grid-template-columns:150px 1fr 120px;align-items:center;gap:12px}
+.lane .name{font-size:13.5px;color:var(--ink-2)}
+.lane .name b{display:block;color:var(--ink);font-size:15px;font-weight:650}
+.lane .track{height:14px;background:var(--sunken);border-radius:2px;position:relative;overflow:hidden}
+.lane .bar{position:absolute;inset:0 auto 0 0;border-radius:2px;transition:width .5s ease}
+.lane .val{font-size:22px;font-weight:650;font-stretch:80%}
+.lane.gv .bar{background:var(--gv)} .lane.gps .bar{background:var(--gps)} .lane.ypf .bar{background:var(--ypf)}
+.lanes .note{font-size:12.5px;color:var(--ink-3);margin-top:2px;max-width:70ch}
+.counts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px;align-content:start}
+.count{border-left:3px solid var(--rule);padding:2px 0 2px 10px}
+.count b{display:block;font-size:26px;font-weight:650;font-stretch:80%;font-variant-numeric:tabular-nums}
+.count span{font-size:12.5px;color:var(--ink-2)}
+.count.bad{border-color:var(--bad)} .count.warn{border-color:var(--warn)} .count.ok{border-color:var(--ok)}
+
+/* Pestañas */
+.tabs{display:flex;gap:4px;padding-top:16px;border-bottom:1px solid var(--rule)}
+.tab{background:none;border:0;border-bottom:3px solid transparent;padding:8px 14px;cursor:pointer;color:var(--ink-2);font-weight:600}
+.tab[aria-selected=true]{color:var(--ink);border-color:var(--ink)}
+.panel{padding:14px 0 40px}
+.panel[hidden]{display:none}
+
+/* Tabla principal */
+.tablebox{overflow-x:auto;background:var(--surface);border:1px solid var(--rule);border-radius:4px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{position:sticky;top:0;background:var(--surface);text-align:left;font-weight:600;color:var(--ink-2);padding:9px 10px;border-bottom:1px solid var(--rule);white-space:nowrap;cursor:pointer;user-select:none}
+th.num{text-align:right}
+th[data-sort]::after{content:"";margin-left:4px}
+th.sorted-asc::after{content:"▲";font-size:9px} th.sorted-desc::after{content:"▼";font-size:9px}
+td{padding:7px 10px;border-bottom:1px solid var(--rule);vertical-align:middle;white-space:nowrap}
+td.why{white-space:normal;min-width:260px}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:var(--sunken)}
+td.pat{font-weight:650;white-space:nowrap}
+td.pat small{display:block;font-weight:400;color:var(--ink-3);font-size:11.5px}
+th.c-gv,td.c-gv{color:var(--gv)} th.c-gps,td.c-gps{color:var(--gps)} th.c-ypf,td.c-ypf{color:var(--ypf)}
+td.c-gv,td.c-gps,td.c-ypf{font-weight:600}
+td .cov{display:block;font-size:11px;color:var(--ink-3);font-weight:400}
+.mini{width:120px;display:flex;flex-direction:column;gap:2px}
+.mini i{display:block;height:4px;border-radius:1px;min-width:1px}
+.mini i.gv{background:var(--gv)} .mini i.gps{background:var(--gps)} .mini i.ypf{background:var(--ypf)}
+.dif-bad{color:var(--bad);font-weight:650} .dif-ok{color:var(--ink-2)}
+.tag{display:inline-block;padding:2px 8px;border-radius:3px;font-size:12px;font-weight:600;white-space:nowrap}
+.tag.bad{background:var(--bad-bg);color:var(--bad)}
+.tag.warn{background:var(--warn-bg);color:var(--warn)}
+.tag.ok{background:var(--ok-bg);color:var(--ok)}
+.tag.mute{background:var(--mute-bg);color:var(--ink-2)}
+td.why{color:var(--ink-2);font-size:12.5px;max-width:320px}
+.pager{display:flex;gap:10px;align-items:center;justify-content:flex-end;padding:10px 0;font-size:13px;color:var(--ink-2)}
+
+/* Matriz */
+.matrix td,.matrix th{padding:5px 6px;text-align:center;font-size:12px;border:1px solid var(--rule)}
+.matrix th{position:sticky;top:0;cursor:default}
+.matrix th.rowh,.matrix td.rowh{position:sticky;left:0;background:var(--surface);text-align:left;font-weight:650;z-index:1}
+.matrix td.cell{min-width:58px;font-variant-numeric:tabular-nums;cursor:pointer}
+.matrix td.cell.ok{background:var(--ok-bg);color:var(--ok)}
+.matrix td.cell.warn{background:var(--warn-bg);color:var(--warn)}
+.matrix td.cell.bad{background:var(--bad-bg);color:var(--bad);font-weight:650}
+.matrix td.cell.mute{color:var(--ink-3)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2);margin:0 0 10px}
+.legend span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:6px;vertical-align:-2px;background:var(--c)}
+
+/* Alertas */
+.alert-groups{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.ag{background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:14px 16px}
+.ag h3{margin:0 0 4px;font-size:16px;font-weight:650}
+.ag p{margin:0 0 10px;color:var(--ink-2);font-size:13px}
+.ag ul{list-style:none;margin:0;padding:0;max-height:260px;overflow:auto}
+.ag li{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid var(--rule);font-size:13px;cursor:pointer}
+.ag li:hover{color:var(--gps)}
+
+/* Detalle de vehículo */
+.scrim{position:fixed;inset:0;background:rgba(10,16,22,.45);z-index:20}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(780px,100%);background:var(--surface);z-index:21;overflow-y:auto;box-shadow:-8px 0 24px rgba(0,0,0,.18);padding:calc(18px + env(safe-area-inset-top,0px)) 24px calc(30px + env(safe-area-inset-bottom,0px))}
+.drawer[hidden],.scrim[hidden]{display:none}
+.drawer h2{margin:0;font-size:28px;font-weight:700;font-stretch:72%}
+.drawer .meta{color:var(--ink-2);font-size:13.5px;margin:4px 0 14px}
+.drawer .close{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:16px}
+.drawer h3{font-size:15px;margin:22px 0 8px;font-weight:650}
+.chartbox{height:260px;position:relative}
+.vsum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.vsum div{border-top:3px solid var(--c);padding-top:6px}
+.vsum b{display:block;font-size:22px;font-weight:650;font-stretch:80%;font-variant-numeric:tabular-nums}
+.vsum span{font-size:12.5px;color:var(--ink-2)}
+.loads td{font-size:12.5px;padding:5px 8px}
+.loads td:first-child,.loads td:nth-child(7){white-space:nowrap}
+.loads tr{cursor:default}
+.loads tr.discard td{color:var(--ink-3)}
+.loads tr.discard td.odo{text-decoration:line-through}
+
+/* Estados vacíos y conexión */
+.empty{padding:40px 20px;text-align:center;color:var(--ink-2);background:var(--surface);border:1px dashed var(--rule);border-radius:4px}
+.empty b{display:block;color:var(--ink);font-size:17px;margin-bottom:6px}
+.setup{max-width:560px;margin:40px auto;background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:22px 24px}
+.setup h2{margin:0 0 6px;font-size:22px;font-stretch:80%}
+.setup p{color:var(--ink-2);font-size:14px}
+.setup label{display:block;font-size:13px;color:var(--ink-2);margin:12px 0 4px}
+.setup input{width:100%;height:38px;border:1px solid var(--rule);border-radius:4px;padding:0 10px;background:var(--paper)}
+.setup .err{color:var(--bad);font-size:13.5px;margin-top:10px}
+.loading{padding:60px 0;text-align:center;color:var(--ink-2)}
+
+@media (max-width:900px){
+  .summary{grid-template-columns:1fr}
+  .lane{grid-template-columns:110px 1fr 90px}
+  .lane .val{font-size:18px}
+  .vsum{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){ .lane .bar{transition:none} }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div>
+      <h1>Auditoría de km</h1>
+      <p class="subtitle">Gestión Vehicular, GPS y odómetro de YPF, por vehículo y mes</p>
+    </div>
+    <div class="conn" id="conn"><span class="dot"></span><span id="connText">Sin conectar</span><button class="linkbtn" id="btnConfig" type="button">Cambiar conexión</button></div>
+  </div>
+</header>
+
+<main class="wrap" id="app">
+  <div class="loading" id="loading">Cargando datos de Supabase…</div>
+</main>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" hidden aria-modal="true" role="dialog" aria-labelledby="dTitle"></aside>
+
+<script>
+"use strict";
+/* ===================== Configuración y estado ===================== */
+const CFG = window.APP_CONFIG || {};
+const LS_KEY = "auditoria_km_conexion";
+const PAGE = 1000, ROWS_PER_PAGE = 100;
+const MIN_KM_ACTIVIDAD = 50;          // por debajo, el mes se considera sin actividad
+const MAX_KM_POR_LITRO = 30;          // por encima, los km son imposibles para los litros
+const RELLENO = new Set([1234,12345,123456,123123,1515,2500,5000,10000,11111,99999]);
+
+const state = {
+  sb:null, rows:[], filtered:[], zonas:[], periodos:[],
+  f:{ desde:"", hasta:"", zona:"", q:"", tol:Number(CFG.TOLERANCIA_PCT)||15, soloDesvios:false, sinActividad:false },
+  sort:{ key:"severidad", dir:-1 }, page:0, tab:"detalle", chart:null
+};
+
+const $ = (s, r=document) => r.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (v, d=0) => (v===null || v===undefined || isNaN(v)) ? "—" : Number(v).toLocaleString("es-AR",{minimumFractionDigits:d, maximumFractionDigits:d});
+const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const mesLabel = p => { if(!p) return "—"; const [y,m] = p.split("-"); return `${MESES[+m-1]} ${y.slice(2)}`; };
+const pct = v => v===null || v===undefined ? "—" : Math.abs(v)>999 ? (v>0?"> +999 %":"< −999 %") : (v>0?"+":"") + fmt(v,1) + " %";
+
+function conexion(){
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(LS_KEY) || "{}"); } catch(e){}
+  const url = saved.url || CFG.SUPABASE_URL || "";
+  const key = saved.key || (CFG.SUPABASE_ANON_KEY && CFG.SUPABASE_ANON_KEY !== "PEGAR_ACA_TU_ANON_KEY" ? CFG.SUPABASE_ANON_KEY : "");
+  return { url, key };
+}
+function setConn(cls, text){ const c=$("#conn"); c.className="conn "+(cls||""); $("#connText").textContent=text; }
+
+/* ===================== Carga de datos ===================== */
+async function cargarTodo(){
+  const cols = "dominio,periodo,zona,modelo,km_gv,km_gps,km_ypf,cobertura_ypf,km_referencia,litros_gv,litros_gps,litros_ypf,cargas_ypf,horas_motor,gps_atipico,dif_gv_vs_gps_pct,dif_gps_vs_ypf_pct,alerta";
+  const out = [];
+  for(let from=0; ; from+=PAGE){
+    const { data, error } = await state.sb.from("v_km_conciliacion").select(cols)
+      .order("periodo",{ascending:true}).order("dominio",{ascending:true}).range(from, from+PAGE-1);
+    if(error) throw error;
+    out.push(...data);
+    if(data.length < PAGE) break;
+  }
+  return out;
+}
+
+const n = v => v===null || v===undefined ? null : Number(v);
+
+/* Clasificación de cada vehículo-mes. Se recalcula al mover la tolerancia. */
+function clasificar(r, tol){
+  const t = tol/100;
+  const gv=r.km_gv, gps=r.km_gps, ypf=r.km_ypf, ref=r.km_referencia;
+  const cubre = r.cobertura_ypf!==null && r.cobertura_ypf>=0.9;
+  const litrosGv = r.litros_gv||0;
+  r.difGv = (ref>0 && gv!==null) ? (gv-ref)/ref*100 : null;
+  r.difGpsYpf = (cubre && ypf>0 && gps!==null) ? (gps-ypf)/ypf*100 : null;
+  const actividad = Math.max(gv||0, gps||0, (cubre?ypf:0)||0, 0) >= MIN_KM_ACTIVIDAD || (r.litros_ypf||0)>0 || litrosGv>0;
+  r.fuenteRef = ref===null ? null : (ref===gps ? "GPS" : (ref===ypf ? "YPF" : "GPS"));
+
+  if(!actividad){ r.estado="Sin actividad"; r.nivel="mute"; r.motivo="Ninguna fuente registra recorrido."; r.sev=0; return r; }
+  if(gv>0 && litrosGv>0 && gv/litrosGv>MAX_KM_POR_LITRO){
+    r.estado="Imposible"; r.nivel="bad"; r.sev=5;
+    r.motivo=`${fmt(gv)} km con ${fmt(litrosGv,1)} L darían ${fmt(gv/litrosGv,0)} km/L. Probablemente se cargó el odómetro o un error de tipeo.`; return r;
+  }
+  const gvCargado = gv!==null && gv>=MIN_KM_ACTIVIDAD;
+  if(litrosGv>0 && !gvCargado){
+    r.estado="Litros sin km"; r.nivel="bad"; r.sev=4;
+    r.motivo=`Gestión registra ${fmt(litrosGv,1)} L y solo ${fmt(gv||0)} km${ref>0?`; la referencia indica ${fmt(ref)} km`:""}.`; return r;
+  }
+  if(ref>=MIN_KM_ACTIVIDAD && !gvCargado){
+    r.estado="Falta en Gestión"; r.nivel="bad"; r.sev=4;
+    r.motivo=`${r.fuenteRef} registra ${fmt(ref)} km y Gestión no tiene el mes cargado.`; return r;
+  }
+  if(gvCargado && ref!==null && ref<MIN_KM_ACTIVIDAD && (gps!==null || cubre)){
+    r.estado="Desvío Gestión"; r.nivel="bad"; r.sev=3.8;
+    r.motivo=`Gestión registra ${fmt(gv)} km pero ${r.fuenteRef} indica que el vehículo casi no se movió (${fmt(ref)} km). Posible mes copiado del anterior.`; return r;
+  }
+  if(r.difGv!==null && Math.abs(r.difGv)/100>t){
+    r.estado="Desvío Gestión"; r.nivel = Math.abs(r.difGv)>50 ? "bad":"warn"; r.sev = Math.abs(r.difGv)>50 ? 3.5 : 3;
+    r.motivo=`Gestión ${fmt(gv)} km contra ${fmt(ref)} km de ${r.fuenteRef} (${pct(r.difGv)}).`; return r;
+  }
+  if(r.difGpsYpf!==null && Math.abs(r.difGpsYpf)/100>t){
+    r.estado="Desvío GPS / YPF"; r.nivel="warn"; r.sev=2;
+    r.motivo=`El GPS marca ${fmt(gps)} km y el odómetro de YPF ${fmt(ypf)} km (${pct(r.difGpsYpf)}). Revisar el equipo GPS.`; return r;
+  }
+  if(gps>0 && r.horas_motor===0){
+    r.estado="GPS sin encendido"; r.nivel="warn"; r.sev=1.5;
+    r.motivo="El equipo informa 0 horas de motor: puede no estar recibiendo la señal de encendido y perder recorrido."; return r;
+  }
+  if(r.gps_atipico){
+    r.estado="GPS atípico"; r.nivel="warn"; r.sev=1.5; r.motivo="El GPS marcó este mes como atípico al importarlo."; return r;
+  }
+  if(!(ref>0) && gv>0){
+    r.estado="Sin referencia"; r.nivel="mute"; r.sev=1;
+    r.motivo="Ni el GPS ni el odómetro de YPF permiten verificar los km de Gestión."; return r;
+  }
+  if(!(ref>0)){
+    r.estado="Datos incompletos"; r.nivel="mute"; r.sev=0.2;
+    r.motivo = ypf>0 ? `Solo hay odómetro de YPF y cubre el ${fmt((r.cobertura_ypf||0)*100)} % del mes.` : "No hay km suficientes para comparar.";
+    return r;
+  }
+  r.estado="Coincide"; r.nivel="ok"; r.sev=0.5;
+  r.motivo = r.difGv!==null ? `Diferencia de ${pct(r.difGv)} contra ${r.fuenteRef}.` : "Dentro de la tolerancia.";
+  return r;
+}
+
+function preparar(raw){
+  state.rows = raw.map(d => ({
+    dominio:d.dominio, periodo:d.periodo, zona:d.zona||"Sin zona", modelo:d.modelo||"",
+    km_gv:n(d.km_gv), km_gps:n(d.km_gps), km_ypf:n(d.km_ypf), cobertura_ypf:n(d.cobertura_ypf),
+    km_referencia:n(d.km_referencia), litros_gv:n(d.litros_gv), litros_gps:n(d.litros_gps),
+    litros_ypf:n(d.litros_ypf), cargas_ypf:n(d.cargas_ypf), horas_motor:n(d.horas_motor),
+    gps_atipico:!!d.gps_atipico, alerta:d.alerta
+  }));
+  state.zonas = [...new Set(state.rows.map(r=>r.zona))].sort();
+  state.periodos = [...new Set(state.rows.map(r=>r.periodo))].sort();
+  // Por defecto, los últimos 12 meses que tienen datos de Gestión
+  const conGv = [...new Set(state.rows.filter(r=>r.km_gv!==null).map(r=>r.periodo))].sort();
+  const ult = conGv.length ? conGv : state.periodos;
+  state.f.hasta = ult[ult.length-1] || "";
+  state.f.desde = ult[Math.max(0, ult.length-12)] || "";
+  reclasificar();
+}
+function reclasificar(){ state.rows.forEach(r => clasificar(r, state.f.tol)); aplicarFiltros(); }
+
+function aplicarFiltros(){
+  const f = state.f, q = f.q.trim().toUpperCase().replace(/\s/g,"");
+  state.filtered = state.rows.filter(r =>
+    (!f.desde || r.periodo>=f.desde) && (!f.hasta || r.periodo<=f.hasta) &&
+    (!f.zona || r.zona===f.zona) && (!q || r.dominio.includes(q)) &&
+    (f.sinActividad || r.estado!=="Sin actividad") &&
+    (!f.soloDesvios || r.nivel==="bad" || r.nivel==="warn"));
+  ordenar(); state.page=0; render();
+}
+
+const SORTERS = {
+  severidad:r=>r.sev, dominio:r=>r.dominio, periodo:r=>r.periodo, zona:r=>r.zona,
+  km_gv:r=>r.km_gv??-1, km_gps:r=>r.km_gps??-1, km_ypf:r=>r.km_ypf??-1, km_referencia:r=>r.km_referencia??-1,
+  difGv:r=>r.difGv===null?-1:Math.abs(r.difGv), estado:r=>r.estado
+};
+function ordenar(){
+  const {key,dir} = state.sort, g = SORTERS[key];
+  state.filtered.sort((a,b)=>{ const x=g(a), y=g(b); if(x<y) return -dir; if(x>y) return dir;
+    return a.periodo===b.periodo ? a.dominio.localeCompare(b.dominio) : (a.periodo<b.periodo?1:-1); });
+}
+
+/* ===================== Render ===================== */
+function render(){
+  const app = $("#app");
+  if(!state.rows.length){
+    app.innerHTML = `<div class="empty" style="margin-top:30px"><b>La vista v_km_conciliacion no devolvió filas.</b>Verificá que el script supabase/conciliacion_km.sql se haya ejecutado y que las tablas de Gestión, GPS e YPF tengan datos.</div>`;
+    return;
+  }
+  if(!$("#filters")) armarEsqueleto();
+  renderResumen();
+  if(state.tab==="detalle") renderTabla();
+  if(state.tab==="matriz") renderMatriz();
+  if(state.tab==="alertas") renderAlertas();
+}
+
+function armarEsqueleto(){
+  const opts = (arr, sel, fn=x=>x) => arr.map(v=>`<option value="${esc(v)}"${v===sel?" selected":""}>${esc(fn(v))}</option>`).join("");
+  $("#app").innerHTML = `
+  <section class="filters" id="filters" aria-label="Filtros">
+    <label class="f">Desde<select id="fDesde">${opts(state.periodos, state.f.desde, mesLabel)}</select></label>
+    <label class="f">Hasta<select id="fHasta">${opts(state.periodos, state.f.hasta, mesLabel)}</select></label>
+    <label class="f">Zona<select id="fZona"><option value="">Todas</option>${opts(state.zonas, state.f.zona)}</select></label>
+    <label class="f">Patente<input id="fQ" type="search" placeholder="Ej. AE817KM" autocomplete="off"></label>
+    <label class="f tol">Tolerancia: <output id="tolOut">${state.f.tol} %</output><input id="fTol" type="range" min="5" max="40" step="1" value="${state.f.tol}"></label>
+    <label class="chk"><input id="fDesv" type="checkbox"> Solo desvíos</label>
+    <label class="chk"><input id="fAct" type="checkbox"> Incluir meses sin actividad</label>
+    <span class="spacer"></span>
+    <button class="btn ghost" id="btnCsv" type="button">Exportar CSV</button>
+  </section>
+  <section class="summary" id="summary" aria-label="Resumen"></section>
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="detalle" aria-selected="true">Vehículo y mes</button>
+    <button class="tab" role="tab" data-tab="matriz" aria-selected="false">Matriz por vehículo</button>
+    <button class="tab" role="tab" data-tab="alertas" aria-selected="false">Desvíos por tipo</button>
+  </nav>
+  <section class="panel" id="p-detalle"></section>
+  <section class="panel" id="p-matriz" hidden></section>
+  <section class="panel" id="p-alertas" hidden></section>`;
+
+  $("#fDesde").onchange = e => { state.f.desde=e.target.value; aplicarFiltros(); };
+  $("#fHasta").onchange = e => { state.f.hasta=e.target.value; aplicarFiltros(); };
+  $("#fZona").onchange  = e => { state.f.zona=e.target.value; aplicarFiltros(); };
+  let tq; $("#fQ").oninput = e => { clearTimeout(tq); tq=setTimeout(()=>{ state.f.q=e.target.value; aplicarFiltros(); },200); };
+  $("#fTol").oninput = e => { state.f.tol=+e.target.value; $("#tolOut").textContent=state.f.tol+" %"; reclasificar(); };
+  $("#fDesv").onchange = e => { state.f.soloDesvios=e.target.checked; aplicarFiltros(); };
+  $("#fAct").onchange  = e => { state.f.sinActividad=e.target.checked; aplicarFiltros(); };
+  $("#btnCsv").onclick = exportarCsv;
+  document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
+    state.tab=b.dataset.tab;
+    document.querySelectorAll(".tab").forEach(x=>x.setAttribute("aria-selected", x===b));
+    document.querySelectorAll(".panel").forEach(p=>p.hidden = p.id!=="p-"+state.tab);
+    render();
+  });
+}
+
+function renderResumen(){
+  const rs = state.filtered;
+  // Totales comparables: solo meses donde las tres fuentes tienen dato (YPF con cobertura completa)
+  const comp = rs.filter(r => r.km_gv!==null && r.km_gps!==null && r.km_ypf!==null && r.cobertura_ypf>=0.9);
+  const tGv = comp.reduce((s,r)=>s+(r.km_gv||0),0), tGps = comp.reduce((s,r)=>s+(r.km_gps||0),0), tYpf = comp.reduce((s,r)=>s+(r.km_ypf||0),0);
+  const mx = Math.max(tGv,tGps,tYpf,1);
+  const cnt = k => rs.filter(r=>r.nivel===k).length;
+  const lane = (cls, nombre, sub, v) => `<div class="lane ${cls}"><div class="name"><b>${nombre}</b>${sub}</div><div class="track"><div class="bar" style="width:${(v/mx*100).toFixed(1)}%"></div></div><div class="val num">${fmt(v)}</div></div>`;
+  $("#summary").innerHTML = `
+    <div class="lanes">
+      ${lane("gv","Gestión Vehicular","Km recorridos", tGv)}
+      ${lane("gps","GPS","Distancia", tGps)}
+      ${lane("ypf","Odómetro YPF","Diferencia entre cargas", tYpf)}
+      <p class="note">${comp.length ? `Km totales de los ${fmt(comp.length)} vehículos-mes que tienen las tres fuentes completas. Gestión ${pct(tGps?(tGv-tGps)/tGps*100:null)} y odómetro ${pct(tGps?(tYpf-tGps)/tGps*100:null)} respecto del GPS.` : "En la selección no hay meses con las tres fuentes completas para comparar totales."}</p>
+    </div>
+    <div class="counts">
+      <div class="count"><b>${fmt(rs.length)}</b><span>Vehículos-mes en la selección</span></div>
+      <div class="count bad"><b>${fmt(cnt("bad"))}</b><span>Errores a corregir</span></div>
+      <div class="count warn"><b>${fmt(cnt("warn"))}</b><span>Desvíos a revisar</span></div>
+      <div class="count ok"><b>${fmt(cnt("ok"))}</b><span>Coinciden dentro del ${state.f.tol} %</span></div>
+    </div>`;
+}
+
+function miniBars(r){
+  const mx = Math.max(r.km_gv||0, r.km_gps||0, r.km_ypf||0, 1);
+  const w = v => v>0 ? Math.max(v/mx*100,1).toFixed(1)+"%" : "0";
+  return `<div class="mini" aria-hidden="true"><i class="gv" style="width:${w(r.km_gv)}"></i><i class="gps" style="width:${w(r.km_gps)}"></i><i class="ypf" style="width:${w(r.km_ypf)}${r.cobertura_ypf<0.9?";opacity:.35":""}"></i></div>`;
+}
+
+function renderTabla(){
+  const p = $("#p-detalle"), rs = state.filtered;
+  if(!rs.length){ p.innerHTML = `<div class="empty"><b>No hay vehículos-mes con estos filtros.</b>Ampliá el rango de meses o desmarcá “Solo desvíos”.</div>`; return; }
+  const pages = Math.ceil(rs.length/ROWS_PER_PAGE); state.page = Math.min(state.page, pages-1);
+  const slice = rs.slice(state.page*ROWS_PER_PAGE, (state.page+1)*ROWS_PER_PAGE);
+  const th = (k, label, cls="") => `<th data-sort="${k}" class="${cls} ${state.sort.key===k?(state.sort.dir>0?"sorted-asc":"sorted-desc"):""}">${label}</th>`;
+  p.innerHTML = `
+  <div class="tablebox"><table>
+    <thead><tr>
+      ${th("dominio","Patente")}${th("periodo","Mes")}${th("zona","Zona")}
+      ${th("km_gv","Gestión","num c-gv")}${th("km_gps","GPS","num c-gps")}${th("km_ypf","Odómetro YPF","num c-ypf")}
+      <th aria-label="Comparación visual"></th>
+      ${th("difGv","Gestión vs ref.","num")}${th("estado","Estado")}<th>Motivo</th>
+    </tr></thead>
+    <tbody>${slice.map((r,i)=>`
+      <tr data-i="${state.page*ROWS_PER_PAGE+i}" tabindex="0">
+        <td class="pat">${esc(r.dominio)}<small>${esc(r.modelo)}</small></td>
+        <td>${mesLabel(r.periodo)}</td>
+        <td>${esc(r.zona)}</td>
+        <td class="num c-gv">${fmt(r.km_gv)}</td>
+        <td class="num c-gps">${fmt(r.km_gps)}</td>
+        <td class="num c-ypf">${fmt(r.km_ypf)}${r.km_ypf!==null?`<span class="cov">cubre ${fmt((r.cobertura_ypf||0)*100)} %</span>`:""}</td>
+        <td>${miniBars(r)}</td>
+        <td class="num ${r.difGv!==null && Math.abs(r.difGv)>state.f.tol?"dif-bad":"dif-ok"}">${pct(r.difGv)}</td>
+        <td><span class="tag ${r.nivel}">${esc(r.estado)}</span></td>
+        <td class="why">${esc(r.motivo)}</td>
+      </tr>`).join("")}
+    </tbody>
+  </table></div>
+  <div class="pager">
+    <span>${fmt(state.page*ROWS_PER_PAGE+1)}–${fmt(Math.min((state.page+1)*ROWS_PER_PAGE, rs.length))} de ${fmt(rs.length)}</span>
+    <button class="btn ghost" id="pgPrev" ${state.page===0?"disabled":""}>Anterior</button>
+    <button class="btn ghost" id="pgNext" ${state.page>=pages-1?"disabled":""}>Siguiente</button>
+  </div>`;
+  p.querySelectorAll("th[data-sort]").forEach(h => h.onclick = () => {
+    const k=h.dataset.sort; state.sort = { key:k, dir: state.sort.key===k ? -state.sort.dir : (["dominio","periodo","zona","estado"].includes(k)?1:-1) };
+    ordenar(); renderTabla();
+  });
+  p.querySelectorAll("tbody tr").forEach(tr => {
+    const open = () => abrirVehiculo(state.filtered[+tr.dataset.i].dominio, state.filtered[+tr.dataset.i].periodo);
+    tr.onclick = open; tr.onkeydown = e => { if(e.key==="Enter") open(); };
+  });
+  const prev=$("#pgPrev"), next=$("#pgNext");
+  if(prev) prev.onclick=()=>{ state.page--; renderTabla(); };
+  if(next) next.onclick=()=>{ state.page++; renderTabla(); };
+}
+
+function renderMatriz(){
+  const p = $("#p-matriz"), rs = state.filtered;
+  if(!rs.length){ p.innerHTML = `<div class="empty"><b>No hay datos para armar la matriz.</b>Ampliá el rango de meses.</div>`; return; }
+  const meses = [...new Set(rs.map(r=>r.periodo))].sort();
+  const porDom = {};
+  rs.forEach(r => { (porDom[r.dominio] ||= {})[r.periodo] = r; });
+  const doms = Object.keys(porDom).sort((a,b)=>{
+    const s = d => Object.values(porDom[d]).reduce((t,r)=>t+r.sev,0);
+    return s(b)-s(a) || a.localeCompare(b);
+  });
+  p.innerHTML = `
+  <p class="legend"><span style="--c:var(--ok-bg)">Coincide</span><span style="--c:var(--warn-bg)">Desvío a revisar</span><span style="--c:var(--bad-bg)">Error a corregir</span><span style="--c:var(--sunken)">Sin actividad o sin referencia</span></p>
+  <p class="legend">Cada celda muestra la diferencia de Gestión contra la referencia del mes. Los vehículos con más problemas aparecen primero.</p>
+  <div class="tablebox"><table class="matrix">
+    <thead><tr><th class="rowh">Patente</th>${meses.map(m=>`<th>${mesLabel(m)}</th>`).join("")}</tr></thead>
+    <tbody>${doms.map(d=>`<tr><td class="rowh">${esc(d)}</td>${meses.map(m=>{
+      const r = porDom[d][m];
+      if(!r) return `<td class="cell mute">·</td>`;
+      const txt = r.estado==="Imposible" ? "!" : r.estado==="Falta en Gestión"||r.estado==="Litros sin km" ? "0" : r.difGv!==null ? (Math.abs(r.difGv)>999 ? (r.difGv>0?"> +999":"< −999") : (r.difGv>0?"+":"")+fmt(r.difGv,0)) : "·";
+      return `<td class="cell ${r.nivel}" data-d="${esc(d)}" data-m="${m}" title="${esc(r.estado+": "+r.motivo)}">${txt}</td>`;
+    }).join("")}</tr>`).join("")}</tbody>
+  </table></div>`;
+  p.querySelectorAll("td.cell[data-d]").forEach(c => c.onclick = () => abrirVehiculo(c.dataset.d, c.dataset.m));
+}
+
+const GRUPOS = [
+  {e:"Imposible", d:"Km de Gestión que no pueden ser reales para los litros cargados. Suele ser el odómetro cargado como km."},
+  {e:"Litros sin km", d:"Gestión tiene litros cargados pero 0 km: el km no se cargó o la celda vino como texto."},
+  {e:"Falta en Gestión", d:"El GPS o el odómetro registran recorrido y Gestión no tiene el mes."},
+  {e:"Desvío Gestión", d:"Gestión difiere de la referencia más que la tolerancia elegida."},
+  {e:"Desvío GPS / YPF", d:"El GPS y el odómetro no coinciden: posible falla del equipo GPS."},
+  {e:"GPS sin encendido", d:"El GPS informa 0 horas de motor. Conviene revisar la instalación del equipo."},
+  {e:"GPS atípico", d:"Valores marcados como atípicos al importar el reporte GPS."},
+  {e:"Sin referencia", d:"Meses con km en Gestión que no se pueden verificar con GPS ni odómetro."},
+  {e:"Datos incompletos", d:"Meses sin km de Gestión ni GPS, donde el odómetro cubre solo parte del mes."}
+];
+function renderAlertas(){
+  const p = $("#p-alertas");
+  const html = GRUPOS.map(g => {
+    const rs = state.filtered.filter(r=>r.estado===g.e).sort((a,b)=>b.periodo.localeCompare(a.periodo)||a.dominio.localeCompare(b.dominio));
+    if(!rs.length) return "";
+    return `<div class="ag"><h3>${g.e} <span class="tag ${rs[0].nivel}">${fmt(rs.length)}</span></h3><p>${g.d}</p>
+      <ul>${rs.map(r=>`<li data-d="${esc(r.dominio)}" data-m="${r.periodo}"><span><b>${esc(r.dominio)}</b> ${mesLabel(r.periodo)}</span><span class="num">${g.e==="Desvío GPS / YPF"?pct(r.difGpsYpf):r.difGv!==null?pct(r.difGv):fmt(r.km_gv)+" km"}</span></li>`).join("")}</ul></div>`;
+  }).join("");
+  p.innerHTML = html ? `<div class="alert-groups">${html}</div>` : `<div class="empty"><b>No hay desvíos con estos filtros.</b>Todos los vehículos-mes coinciden dentro del ${state.f.tol} %.</div>`;
+  p.querySelectorAll("li[data-d]").forEach(li => li.onclick = () => abrirVehiculo(li.dataset.d, li.dataset.m));
+}
+
+/* ===================== Detalle de vehículo ===================== */
+let lastFocus = null;
+function cerrarDrawer(){
+  $("#drawer").hidden = true; $("#scrim").hidden = true;
+  if(state.chart){ state.chart.destroy(); state.chart=null; }
+  if(lastFocus) lastFocus.focus();
+}
+document.addEventListener("keydown", e => { if(e.key==="Escape" && !$("#drawer").hidden) cerrarDrawer(); });
+$("#scrim").onclick = cerrarDrawer;
+
+async function abrirVehiculo(dom, mesSel){
+  lastFocus = document.activeElement;
+  const dr = $("#drawer");
+  const filas = state.rows.filter(r=>r.dominio===dom).sort((a,b)=>a.periodo.localeCompare(b.periodo));
+  const info = { modelo: [...filas].reverse().find(r=>r.modelo)?.modelo || "",
+                 zona: [...filas].reverse().find(r=>r.zona && r.zona!=="Sin zona")?.zona || "" };
+  const comp = filas.filter(r=>r.km_gv!==null && r.km_gps!==null && r.km_ypf!==null && r.cobertura_ypf>=0.9);
+  const s = k => comp.reduce((t,r)=>t+(r[k]||0),0);
+  dr.innerHTML = `
+    <button class="btn ghost close" type="button" id="dClose">Cerrar</button>
+    <h2 id="dTitle">${esc(dom)}</h2>
+    <p class="meta">${esc([info.modelo, info.zona].filter(Boolean).join(", "))}${mesSel?`. Mes seleccionado: ${mesLabel(mesSel)}`:""}</p>
+    <div class="vsum">
+      <div style="--c:var(--gv)"><b>${fmt(s("km_gv"))}</b><span>Gestión, en ${comp.length} meses comparables</span></div>
+      <div style="--c:var(--gps)"><b>${fmt(s("km_gps"))}</b><span>GPS, mismos meses</span></div>
+      <div style="--c:var(--ypf)"><b>${fmt(s("km_ypf"))}</b><span>Odómetro YPF, mismos meses</span></div>
+    </div>
+    <h3>Km por mes según cada fuente</h3>
+    <div class="chartbox"><canvas id="dChart" aria-label="Gráfico de km por mes"></canvas></div>
+    <h3>Meses</h3>
+    <div class="tablebox"><table>
+      <thead><tr><th>Mes</th><th class="num c-gv">Gestión</th><th class="num c-gps">GPS</th><th class="num c-ypf">Odómetro</th><th class="num">Litros</th><th class="num">Km/L ref.</th><th>Estado</th></tr></thead>
+      <tbody>${filas.slice().reverse().map(r=>`<tr style="cursor:default${r.periodo===mesSel?";outline:2px solid var(--focus);outline-offset:-2px":""}">
+        <td>${mesLabel(r.periodo)}</td><td class="num c-gv">${fmt(r.km_gv)}</td><td class="num c-gps">${fmt(r.km_gps)}</td>
+        <td class="num c-ypf">${fmt(r.km_ypf)}${r.km_ypf!==null?`<span class="cov">cubre ${fmt((r.cobertura_ypf||0)*100)} %</span>`:""}</td>
+        <td class="num">${fmt(r.litros_gps ?? r.litros_ypf ?? r.litros_gv,1)}</td>
+        <td class="num">${(()=>{const L=r.litros_gps ?? r.litros_ypf ?? r.litros_gv; return r.km_referencia>0 && L>0 ? fmt(r.km_referencia/L,1) : "—";})()}</td>
+        <td><span class="tag ${r.nivel}" title="${esc(r.motivo)}">${esc(r.estado)}</span></td></tr>`).join("")}</tbody>
+    </table></div>
+    <h3>Cargas de YPF y lectura de odómetro</h3>
+    <div id="dLoads"><div class="loading" style="padding:20px 0">Cargando cargas…</div></div>`;
+  dr.hidden=false; $("#scrim").hidden=false; dr.scrollTop=0;
+  $("#dClose").onclick = cerrarDrawer; $("#dClose").focus();
+
+  if(window.Chart){
+    const css = getComputedStyle(document.documentElement);
+    const col = v => css.getPropertyValue(v).trim();
+    if(state.chart) state.chart.destroy();
+    state.chart = new Chart($("#dChart"), {
+      type:"line",
+      data:{ labels: filas.map(r=>mesLabel(r.periodo)), datasets:[
+        {label:"Gestión", data:filas.map(r=>r.km_gv), borderColor:col("--gv"), backgroundColor:col("--gv"), tension:.2, spanGaps:false},
+        {label:"GPS", data:filas.map(r=>r.km_gps), borderColor:col("--gps"), backgroundColor:col("--gps"), tension:.2},
+        {label:"Odómetro YPF", data:filas.map(r=>r.cobertura_ypf>=0.9?r.km_ypf:null), borderColor:col("--ypf"), backgroundColor:col("--ypf"), borderDash:[5,4], tension:.2}
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:"index",intersect:false},
+        plugins:{ legend:{labels:{color:col("--ink-2"), boxWidth:12}}, tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${fmt(c.parsed.y)} km`}}},
+        scales:{ x:{ticks:{color:col("--ink-3")}, grid:{color:col("--rule")}}, y:{ticks:{color:col("--ink-3"), callback:v=>fmt(v)}, grid:{color:col("--rule")}, beginAtZero:true} } }
+    });
+  }
+  cargarCargas(dom);
+}
+
+async function cargarCargas(dom){
+  const box = $("#dLoads");
+  try{
+    const [c, v] = await Promise.all([
+      state.sb.from("ypf_consumos").select("fecha,litros,odometro,producto,establecimiento,localidad,conductor,es_combustible")
+        .eq("vehiculo_dominio", dom).order("fecha",{ascending:false}).limit(400),
+      state.sb.from("v_ypf_odometro_limpio").select("fecha,odo").eq("dominio", dom)
+    ]);
+    if(c.error) throw c.error; if(v.error) throw v.error;
+    if(!$("#drawer") || $("#drawer").hidden) return;
+    const validos = new Set(v.data.map(x=>Number(x.odo)));
+    const ordenV = v.data.map(x=>({t:new Date(x.fecha).getTime(), o:Number(x.odo)})).sort((a,b)=>a.t-b.t);
+    const kmDesdeAnterior = (odo) => { const i = ordenV.findIndex(x=>x.o===odo); return i>0 ? odo-ordenV[i-1].o : null; };
+    if(!c.data.length){ box.innerHTML = `<div class="empty">No hay cargas de YPF registradas para esta patente.</div>`; return; }
+    box.innerHTML = `<div class="tablebox"><table class="loads">
+      <thead><tr><th>Fecha</th><th class="num">Litros</th><th class="num">Odómetro</th><th class="num">Km desde la anterior</th><th>Lectura</th><th>Estación</th><th>Conductor</th></tr></thead>
+      <tbody>${c.data.map(x=>{
+        const odo = x.odometro===null ? null : Number(x.odometro);
+        let estado, cls="";
+        if(x.es_combustible===false){ estado="No es combustible"; cls="discard"; }
+        else if(odo===null){ estado="Sin odómetro"; cls="discard"; }
+        else if(odo<1000 || RELLENO.has(odo)){ estado="Valor de relleno"; cls="discard"; }
+        else if(validos.has(odo)){ estado="Válida"; }
+        else { estado="Fuera de secuencia"; cls="discard"; }
+        const d = cls ? null : kmDesdeAnterior(odo);
+        const f = new Date(x.fecha);
+        return `<tr class="${cls}"><td>${f.toLocaleDateString("es-AR")} ${f.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})}</td>
+          <td class="num">${fmt(x.litros,2)}</td><td class="num odo">${odo===null?"—":odo.toLocaleString("es-AR")}</td>
+          <td class="num">${d===null?"—":fmt(d)}</td>
+          <td><span class="tag ${cls?"mute":"ok"}">${estado}</span></td>
+          <td>${esc((x.establecimiento||"").replace(/^\d+\s*-\s*/,""))}<br><small style="color:var(--ink-3)">${esc(x.localidad||"")}</small></td>
+          <td>${esc(x.conductor||"")}</td></tr>`;
+      }).join("")}</tbody></table></div>
+      <p class="legend" style="margin-top:8px">“Fuera de secuencia” son lecturas que retroceden, se repiten durante semanas o implican más de 1.500 km por día. No se usan para calcular km.</p>`;
+  }catch(e){
+    box.innerHTML = `<div class="empty"><b>No se pudieron leer las cargas de YPF.</b>${esc(e.message||e)}</div>`;
+  }
+}
+
+/* ===================== Exportar ===================== */
+function exportarCsv(){
+  const num = (v,d=0) => v===null||v===undefined||isNaN(v) ? "" : Number(v).toFixed(d).replace(".",",");
+  const head = ["Patente","Modelo","Zona","Mes","Km Gestión","Km GPS","Km odómetro YPF","Cobertura YPF %","Km referencia","Fuente referencia","Dif Gestión vs ref %","Dif GPS vs YPF %","Litros Gestión","Litros GPS","Litros YPF","Estado","Motivo"];
+  const lines = state.filtered.map(r=>[r.dominio,r.modelo,r.zona,r.periodo,num(r.km_gv),num(r.km_gps),num(r.km_ypf),num((r.cobertura_ypf??null)===null?null:r.cobertura_ypf*100),
+    num(r.km_referencia),r.fuenteRef||"",num(r.difGv,1),num(r.difGpsYpf,1),num(r.litros_gv,2),num(r.litros_gps,2),num(r.litros_ypf,2),r.estado,r.motivo]);
+  const csv = [head, ...lines].map(l=>l.map(c=>{ const s=String(c??""); return /[;"\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; }).join(";")).join("\r\n");
+  const blob = new Blob(["\ufeff"+csv], {type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `auditoria_km_${state.f.desde}_${state.f.hasta}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+}
+
+/* ===================== Conexión ===================== */
+function pantallaConexion(msg){
+  const {url,key} = conexion();
+  setConn("err", "Sin conectar");
+  $("#app").innerHTML = `<form class="setup" id="setup">
+    <h2>Conectar con Supabase</h2>
+    <p>La app lee las vistas de conciliación de tu proyecto. Usá la clave pública anon, la misma que usa el dashboard de Gestión Vehicular. Queda guardada solo en este navegador.</p>
+    <label for="sUrl">URL del proyecto</label><input id="sUrl" value="${esc(url)}" required>
+    <label for="sKey">Anon public key</label><input id="sKey" value="${esc(key)}" required autocomplete="off">
+    ${msg?`<p class="err">${esc(msg)}</p>`:""}
+    <p><button class="btn" type="submit">Conectar</button></p>
+  </form>`;
+  $("#setup").onsubmit = e => {
+    e.preventDefault();
+    localStorage.setItem(LS_KEY, JSON.stringify({url:$("#sUrl").value.trim(), key:$("#sKey").value.trim()}));
+    iniciar();
+  };
+}
+$("#btnConfig").onclick = () => pantallaConexion();
+
+async function iniciar(){
+  const {url,key} = conexion();
+  if(!url || !key){ pantallaConexion(); return; }
+  if(!window.supabase){ pantallaConexion("No se pudo cargar la librería de Supabase. Revisá la conexión a internet."); return; }
+  $("#app").innerHTML = `<div class="loading">Cargando datos de Supabase…</div>`;
+  setConn("", "Conectando…");
+  try{
+    state.sb = window.supabase.createClient(url, key);
+    const raw = await cargarTodo();
+    preparar(raw);
+    setConn("ok", `Actualizado ${new Date().toLocaleString("es-AR",{dateStyle:"short",timeStyle:"short"})}`);
+    render();
+  }catch(e){
+    const m = String(e.message||e);
+    const ayuda = /v_km_conciliacion|does not exist|relation/i.test(m)
+      ? "La vista v_km_conciliacion no existe todavía. Ejecutá supabase/conciliacion_km.sql en el SQL Editor de Supabase."
+      : /JWT|apikey|Invalid API key|401/i.test(m) ? "La anon key no es válida para este proyecto." : m;
+    pantallaConexion(ayuda);
+  }
+}
+iniciar();
+</script>
+</body>
+</html>
