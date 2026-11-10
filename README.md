@@ -17,6 +17,19 @@ Es HTML y JavaScript puro, sin build, igual que `indicadores_gv` y `gps_resumen_
 - **Desvíos por tipo**: los casos agrupados por tipo de problema.
 - **Detalle de vehículo** (clic en cualquier fila o celda): gráfico de las tres fuentes mes a mes y todas las cargas de YPF con su odómetro, marcando cuáles se usaron y cuáles se descartaron.
 - **Exportar CSV** con lo filtrado, listo para abrir en Excel (separador `;` y coma decimal).
+- **Uso en celular**: en pantallas chicas la tabla se convierte en tarjetas, los filtros se pliegan detrás del botón "Filtros" y el detalle de vehículo ocupa toda la pantalla.
+- **Instalable como app** en Android, iPhone y computadora, con ícono propio y ventana sin barra del navegador.
+- **Sin conexión**: si no hay internet, muestra los últimos datos descargados en ese dispositivo y avisa la fecha.
+
+## Instalar en el celular
+
+La app tiene que estar publicada en una dirección `https` (Vercel o GitHub Pages lo hacen solos).
+
+- **Android (Chrome)**: abrí el link y tocá **Instalar app** en el encabezado, o el menú ⋮ → *Instalar aplicación*.
+- **iPhone o iPad (Safari)**: tocá **Instalar app** para ver los pasos, o directamente Compartir → *Agregar a inicio*.
+- **Computadora (Chrome o Edge)**: botón **Instalar app** o el ícono de instalar en la barra de direcciones.
+
+Cuando publiques cambios importantes, subí el número de `VERSION` en `sw.js` para que los dispositivos que ya la instalaron descarguen la versión nueva.
 
 ### Referencia y estados
 
@@ -75,6 +88,9 @@ Después importá el repositorio en Vercel (o activá GitHub Pages). No requiere
 |---|---|
 | `index.html` | La aplicación completa |
 | `config.js` | URL de Supabase, anon key y tolerancia inicial |
+| `manifest.webmanifest` | Nombre, colores e íconos para instalarla como app |
+| `sw.js` | Service worker: permite instalarla y abrirla sin conexión |
+| `icons/` | Íconos de la app |
 | `supabase/conciliacion_km.sql` | Vistas de conciliación |
 
 ## Seguridad

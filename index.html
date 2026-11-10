@@ -4,7 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Auditoría de km</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231E2A36'/><rect x='6' y='9' width='14' height='3' fill='%23D19A3A'/><rect x='6' y='15' width='20' height='3' fill='%235B9BD5'/><rect x='6' y='21' width='17' height='3' fill='%2334A88A'/></svg>">
+<link rel="icon" type="image/png" href="icons/favicon-64.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1B242D" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Auditoría km">
+<meta name="description" content="Compara los km de Gestión Vehicular, GPS y odómetro de YPF por vehículo y mes.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&display=swap" rel="stylesheet">
@@ -104,7 +113,8 @@ th.sorted-asc::after{content:"▲";font-size:9px} th.sorted-desc::after{content:
 td{padding:7px 10px;border-bottom:1px solid var(--rule);vertical-align:middle;white-space:nowrap}
 td.why{white-space:normal;min-width:260px}
 tbody tr{cursor:pointer}
-tbody tr:hover td{background:var(--sunken)}
+@media (hover:hover){ tbody tr:hover td{background:var(--sunken)} }
+.short{display:none}
 td.pat{font-weight:650;white-space:nowrap}
 td.pat small{display:block;font-weight:400;color:var(--ink-3);font-size:11.5px}
 th.c-gv,td.c-gv{color:var(--gv)} th.c-gps,td.c-gps{color:var(--gps)} th.c-ypf,td.c-ypf{color:var(--ypf)}
@@ -173,11 +183,113 @@ td.why{color:var(--ink-2);font-size:12.5px;max-width:320px}
 .setup .err{color:var(--bad);font-size:13.5px;margin-top:10px}
 .loading{padding:60px 0;text-align:center;color:var(--ink-2)}
 
+.hright{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.btn.install{height:34px}
+.btn:disabled{opacity:.4;cursor:default}
+.offline{background:var(--warn-bg);color:var(--warn);font-size:13.5px;padding:8px 20px;text-align:center}
+.fbar{display:contents}
+.fmore{display:contents}
+.btnFiltros{display:none}
+.sortbar{display:none}
+.cards{display:flex;flex-direction:column;gap:10px}
+.card{background:var(--surface);border:1px solid var(--rule);border-left:4px solid var(--rule);border-radius:4px;padding:12px 14px;cursor:pointer}
+.card.bad{border-left-color:var(--bad)} .card.warn{border-left-color:var(--warn)} .card.ok{border-left-color:var(--ok)}
+.card .ch{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.card .ch b{font-size:17px}
+.card .ch .m{color:var(--ink-2);font-size:13.5px}
+.card .ch .tag{margin-left:auto}
+.card .sub{color:var(--ink-3);font-size:12.5px;margin-top:1px}
+.card .cv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0 8px}
+.card .cv small{display:block;font-size:11.5px;color:var(--ink-2)}
+.card .cv b{display:block;font-size:18px;font-weight:650;font-variant-numeric:tabular-nums}
+.card .cv .gv b{color:var(--gv)} .card .cv .gps b{color:var(--gps)} .card .cv .ypf b{color:var(--ypf)}
+.card .cv .cov{font-size:11px;color:var(--ink-3)}
+.card .mini{width:100%}
+.card .mini i{height:5px}
+.card p{margin:8px 0 0;font-size:13px;color:var(--ink-2)}
+.card .dif{font-weight:650}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:31;background:var(--surface);border-radius:12px 12px 0 0;padding:20px 22px calc(22px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 24px rgba(0,0,0,.2)}
+.sheet[hidden]{display:none}
+.sheet h2{margin:0 0 8px;font-size:20px;font-stretch:80%}
+.sheet p{color:var(--ink-2);margin:0 0 16px}
+#iosScrim{z-index:30}
 @media (max-width:900px){
   .summary{grid-template-columns:1fr}
   .lane{grid-template-columns:110px 1fr 90px}
   .lane .val{font-size:18px}
   .vsum{grid-template-columns:1fr}
+}
+@media (max-width:700px){
+  html,body{font-size:15px}
+  .wrap{padding:0 14px}
+  header.top{padding:calc(12px + env(safe-area-inset-top,0px)) 0 10px;position:sticky;top:0;z-index:10}
+  header.top .wrap{align-items:center;flex-wrap:nowrap}
+  h1{font-size:24px}
+  .subtitle{display:none}
+  .hright{gap:8px;flex-wrap:nowrap}
+  .conn #connText{display:none}
+  .conn{gap:6px}
+  .btn{height:40px}
+  .btn.install{height:36px;padding:0 10px}
+
+  .filters{gap:10px;padding:12px 0}
+  .fbar{display:flex;gap:8px;width:100%}
+  .fbar .f{flex:1}
+  .fbar .f span.lbl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .f input[type=search]{min-width:0;width:100%;height:40px;font-size:16px}
+  .btnFiltros{display:inline-flex;align-items:center;gap:6px;align-self:flex-end}
+  .btnFiltros .n{background:var(--ink);color:var(--paper);border-radius:10px;padding:0 7px;font-size:12px;line-height:18px}
+  .fmore{display:none;width:100%;grid-template-columns:1fr 1fr;gap:12px}
+  .fmore.open{display:grid}
+  .fmore .f select{width:100%;height:40px;min-width:0;font-size:16px}
+  .fmore .f.zona,.fmore .f.tol,.fmore .btn{grid-column:1/-1}
+  .fmore .f input[type=range]{width:100%;height:30px}
+  .fmore .chk{height:auto;min-height:40px}
+  .fmore .spacer{display:none}
+
+  .summary{gap:16px;padding:12px 0 16px}
+  .lane{grid-template-columns:78px 1fr auto;gap:8px}
+  .lane .name{font-size:12px} .lane .name b{font-size:14px}
+  .lane .track{height:10px}
+  .lane .val{font-size:17px}
+  .counts{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+  .count{padding-left:7px}
+  .count b{font-size:20px}
+  .count span{font-size:11px;line-height:1.25;display:block}
+
+  .tabs{position:sticky;top:calc(52px + env(safe-area-inset-top,0px));z-index:9;background:var(--paper);overflow-x:auto;scrollbar-width:none;padding-top:6px}
+  .tab{flex:1 0 auto;padding:10px 12px;font-size:14px}
+  .sortbar{display:flex;gap:8px;align-items:center;margin-bottom:10px;font-size:13px;color:var(--ink-2)}
+  .sortbar select{flex:1;height:38px;border:1px solid var(--rule);border-radius:4px;background:var(--surface);padding:0 8px;font-size:15px}
+  .pager{justify-content:space-between}
+  .pager .btn{flex:1}
+  .pager span{flex-basis:100%;text-align:center;order:-1}
+  .pager{flex-wrap:wrap}
+
+  .matrix td.cell{min-width:48px;font-size:11.5px}
+  .alert-groups{grid-template-columns:1fr}
+  .ag li{padding:9px 0}
+
+  .drawer{width:100%;padding:0 14px calc(30px + env(safe-area-inset-bottom,0px))}
+  .drawer .dhead{position:sticky;top:0;background:var(--surface);z-index:2;padding:calc(12px + env(safe-area-inset-top,0px)) 0 8px;margin:0 -14px;padding-left:14px;padding-right:14px;border-bottom:1px solid var(--rule)}
+  .drawer .close{top:calc(10px + env(safe-area-inset-top,0px));right:12px}
+  .drawer h2{font-size:24px}
+  .chartbox{height:220px}
+  .vsum{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .vsum b{font-size:17px}
+  .vsum span{font-size:11px}
+
+  table.stack thead{display:none}
+  table.stack, table.stack tbody{display:block}
+  table.stack tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;padding:10px 12px;border-bottom:1px solid var(--rule)}
+  table.stack td{border:0;padding:0;text-align:left;white-space:normal}
+  table.stack td::before{content:attr(data-l);display:block;font-size:11px;color:var(--ink-3);font-weight:400}
+  table.stack td.full{grid-column:1/-1}
+  table.stack td.full::before{display:none}
+  table.stack td .cov{display:inline;margin-left:4px;white-space:nowrap}
+  table.stack tbody tr:hover td{background:none}
+  table.loads td:first-child{grid-column:1/-1;white-space:normal;font-weight:600}
+  .short{display:inline} .long{display:none}
 }
 @media (prefers-reduced-motion:reduce){ .lane .bar{transition:none} }
 </style>
@@ -189,7 +301,10 @@ td.why{color:var(--ink-2);font-size:12.5px;max-width:320px}
       <h1>Auditoría de km</h1>
       <p class="subtitle">Gestión Vehicular, GPS y odómetro de YPF, por vehículo y mes</p>
     </div>
-    <div class="conn" id="conn"><span class="dot"></span><span id="connText">Sin conectar</span><button class="linkbtn" id="btnConfig" type="button">Cambiar conexión</button></div>
+    <div class="hright">
+      <button class="btn install" id="btnInstall" type="button" hidden>Instalar app</button>
+      <div class="conn" id="conn"><span class="dot"></span><span id="connText">Sin conectar</span><button class="linkbtn" id="btnConfig" type="button">Cambiar conexión</button></div>
+    </div>
   </div>
 </header>
 
@@ -199,12 +314,19 @@ td.why{color:var(--ink-2);font-size:12.5px;max-width:320px}
 
 <div class="scrim" id="scrim" hidden></div>
 <aside class="drawer" id="drawer" hidden aria-modal="true" role="dialog" aria-labelledby="dTitle"></aside>
+<div class="scrim" id="iosScrim" hidden></div>
+<div class="sheet" id="iosSheet" hidden role="dialog" aria-labelledby="iosTitle">
+  <h2 id="iosTitle">Instalar en iPhone o iPad</h2>
+  <p>En Safari, tocá el botón Compartir (el cuadrado con la flecha hacia arriba) y elegí <b>Agregar a inicio</b>. La app queda con su ícono junto a las demás.</p>
+  <button class="btn" type="button" id="iosOk">Entendido</button>
+</div>
 
 <script>
 "use strict";
 /* ===================== Configuración y estado ===================== */
 const CFG = window.APP_CONFIG || {};
 const LS_KEY = "auditoria_km_conexion";
+const LS_DATA = "auditoria_km_datos";
 const PAGE = 1000, ROWS_PER_PAGE = 100;
 const MIN_KM_ACTIVIDAD = 50;          // por debajo, el mes se considera sin actividad
 const MAX_KM_POR_LITRO = 30;          // por encima, los km son imposibles para los litros
@@ -321,6 +443,7 @@ function preparar(raw){
   const ult = conGv.length ? conGv : state.periodos;
   state.f.hasta = ult[ult.length-1] || "";
   state.f.desde = ult[Math.max(0, ult.length-12)] || "";
+  state.defaults = { desde:state.f.desde, hasta:state.f.hasta, tol:state.f.tol };
   reclasificar();
 }
 function reclasificar(){ state.rows.forEach(r => clasificar(r, state.f.tol)); aplicarFiltros(); }
@@ -333,6 +456,12 @@ function aplicarFiltros(){
     (f.sinActividad || r.estado!=="Sin actividad") &&
     (!f.soloDesvios || r.nivel==="bad" || r.nivel==="warn"));
   ordenar(); state.page=0; render();
+  const nb = $("#nFiltros");
+  if(nb){
+    const def = state.defaults || {};
+    const n = [f.desde!==def.desde || f.hasta!==def.hasta, !!f.zona, f.tol!==def.tol, f.soloDesvios, f.sinActividad].filter(Boolean).length;
+    nb.textContent = n; nb.hidden = !n;
+  }
 }
 
 const SORTERS = {
@@ -364,21 +493,26 @@ function armarEsqueleto(){
   const opts = (arr, sel, fn=x=>x) => arr.map(v=>`<option value="${esc(v)}"${v===sel?" selected":""}>${esc(fn(v))}</option>`).join("");
   $("#app").innerHTML = `
   <section class="filters" id="filters" aria-label="Filtros">
-    <label class="f">Desde<select id="fDesde">${opts(state.periodos, state.f.desde, mesLabel)}</select></label>
-    <label class="f">Hasta<select id="fHasta">${opts(state.periodos, state.f.hasta, mesLabel)}</select></label>
-    <label class="f">Zona<select id="fZona"><option value="">Todas</option>${opts(state.zonas, state.f.zona)}</select></label>
-    <label class="f">Patente<input id="fQ" type="search" placeholder="Ej. AE817KM" autocomplete="off"></label>
-    <label class="f tol">Tolerancia: <output id="tolOut">${state.f.tol} %</output><input id="fTol" type="range" min="5" max="40" step="1" value="${state.f.tol}"></label>
-    <label class="chk"><input id="fDesv" type="checkbox"> Solo desvíos</label>
-    <label class="chk"><input id="fAct" type="checkbox"> Incluir meses sin actividad</label>
-    <span class="spacer"></span>
-    <button class="btn ghost" id="btnCsv" type="button">Exportar CSV</button>
+    <div class="fbar">
+      <label class="f"><span class="lbl">Patente</span><input id="fQ" type="search" placeholder="Buscar patente" autocomplete="off" autocapitalize="characters" enterkeyhint="search"></label>
+      <button class="btn ghost btnFiltros" id="btnFiltros" type="button" aria-expanded="false" aria-controls="fmore">Filtros <span class="n" id="nFiltros" hidden></span></button>
+    </div>
+    <div class="fmore" id="fmore">
+      <label class="f">Desde<select id="fDesde">${opts(state.periodos, state.f.desde, mesLabel)}</select></label>
+      <label class="f">Hasta<select id="fHasta">${opts(state.periodos, state.f.hasta, mesLabel)}</select></label>
+      <label class="f zona">Zona<select id="fZona"><option value="">Todas</option>${opts(state.zonas, state.f.zona)}</select></label>
+      <label class="f tol">Tolerancia: <output id="tolOut">${state.f.tol} %</output><input id="fTol" type="range" min="5" max="40" step="1" value="${state.f.tol}"></label>
+      <label class="chk"><input id="fDesv" type="checkbox"> Solo desvíos</label>
+      <label class="chk"><input id="fAct" type="checkbox"> Meses sin actividad</label>
+      <span class="spacer"></span>
+      <button class="btn ghost" id="btnCsv" type="button">Exportar CSV</button>
+    </div>
   </section>
   <section class="summary" id="summary" aria-label="Resumen"></section>
   <nav class="tabs" role="tablist">
-    <button class="tab" role="tab" data-tab="detalle" aria-selected="true">Vehículo y mes</button>
-    <button class="tab" role="tab" data-tab="matriz" aria-selected="false">Matriz por vehículo</button>
-    <button class="tab" role="tab" data-tab="alertas" aria-selected="false">Desvíos por tipo</button>
+    <button class="tab" role="tab" data-tab="detalle" aria-selected="true"><span class="long">Vehículo y mes</span><span class="short">Lista</span></button>
+    <button class="tab" role="tab" data-tab="matriz" aria-selected="false"><span class="long">Matriz por vehículo</span><span class="short">Matriz</span></button>
+    <button class="tab" role="tab" data-tab="alertas" aria-selected="false"><span class="long">Desvíos por tipo</span><span class="short">Por tipo</span></button>
   </nav>
   <section class="panel" id="p-detalle"></section>
   <section class="panel" id="p-matriz" hidden></section>
@@ -392,6 +526,10 @@ function armarEsqueleto(){
   $("#fDesv").onchange = e => { state.f.soloDesvios=e.target.checked; aplicarFiltros(); };
   $("#fAct").onchange  = e => { state.f.sinActividad=e.target.checked; aplicarFiltros(); };
   $("#btnCsv").onclick = exportarCsv;
+  $("#btnFiltros").onclick = () => {
+    const open = $("#fmore").classList.toggle("open");
+    $("#btnFiltros").setAttribute("aria-expanded", open);
+  };
   document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
     state.tab=b.dataset.tab;
     document.querySelectorAll(".tab").forEach(x=>x.setAttribute("aria-selected", x===b));
@@ -410,9 +548,9 @@ function renderResumen(){
   const lane = (cls, nombre, sub, v) => `<div class="lane ${cls}"><div class="name"><b>${nombre}</b>${sub}</div><div class="track"><div class="bar" style="width:${(v/mx*100).toFixed(1)}%"></div></div><div class="val num">${fmt(v)}</div></div>`;
   $("#summary").innerHTML = `
     <div class="lanes">
-      ${lane("gv","Gestión Vehicular","Km recorridos", tGv)}
-      ${lane("gps","GPS","Distancia", tGps)}
-      ${lane("ypf","Odómetro YPF","Diferencia entre cargas", tYpf)}
+      ${lane("gv",'<span class="long">Gestión Vehicular</span><span class="short">Gestión</span>','<span class="long">Km recorridos</span>', tGv)}
+      ${lane("gps","GPS",'<span class="long">Distancia</span>', tGps)}
+      ${lane("ypf",'<span class="long">Odómetro YPF</span><span class="short">Odómetro</span>','<span class="long">Diferencia entre cargas</span>', tYpf)}
       <p class="note">${comp.length ? `Km totales de los ${fmt(comp.length)} vehículos-mes que tienen las tres fuentes completas. Gestión ${pct(tGps?(tGv-tGps)/tGps*100:null)} y odómetro ${pct(tGps?(tYpf-tGps)/tGps*100:null)} respecto del GPS.` : "En la selección no hay meses con las tres fuentes completas para comparar totales."}</p>
     </div>
     <div class="counts">
@@ -429,11 +567,60 @@ function miniBars(r){
   return `<div class="mini" aria-hidden="true"><i class="gv" style="width:${w(r.km_gv)}"></i><i class="gps" style="width:${w(r.km_gps)}"></i><i class="ypf" style="width:${w(r.km_ypf)}${r.cobertura_ypf<0.9?";opacity:.35":""}"></i></div>`;
 }
 
+const MQ = window.matchMedia("(max-width: 700px)");
+const esCelular = () => MQ.matches;
+MQ.addEventListener ? MQ.addEventListener("change", () => state.rows.length && render()) : MQ.addListener(() => state.rows.length && render());
+
+const ORDENES = [
+  ["severidad",-1,"Gravedad"], ["difGv",-1,"Mayor diferencia"], ["periodo",-1,"Mes más reciente"],
+  ["dominio",1,"Patente"], ["km_gv",-1,"Más km en Gestión"]
+];
+function renderTarjetas(p, rs, slice, pages){
+  const sel = ORDENES.findIndex(o=>o[0]===state.sort.key && o[1]===state.sort.dir);
+  p.innerHTML = `
+  <div class="sortbar"><label for="sortSel">Ordenar</label>
+    <select id="sortSel">${ORDENES.map((o,i)=>`<option value="${i}"${i===sel?" selected":""}>${o[2]}</option>`).join("")}${sel<0?`<option selected disabled>Personalizado</option>`:""}</select></div>
+  <div class="cards">${slice.map((r,i)=>`
+    <article class="card ${r.nivel}" role="button" tabindex="0" data-i="${state.page*ROWS_PER_PAGE+i}" aria-label="${esc(r.dominio)} ${mesLabel(r.periodo)}: ${esc(r.estado)}">
+      <div class="ch"><b>${esc(r.dominio)}</b><span class="m">${mesLabel(r.periodo)}</span><span class="tag ${r.nivel}">${esc(r.estado)}</span></div>
+      <div class="sub">${esc([r.modelo, r.zona!=="Sin zona"?r.zona:""].filter(Boolean).join(", "))}</div>
+      <div class="cv">
+        <div class="gv"><small>Gestión</small><b>${fmt(r.km_gv)}</b></div>
+        <div class="gps"><small>GPS</small><b>${fmt(r.km_gps)}</b></div>
+        <div class="ypf"><small>Odómetro</small><b>${fmt(r.km_ypf)}</b>${r.km_ypf!==null?`<span class="cov">cubre ${fmt((r.cobertura_ypf||0)*100)} %</span>`:""}</div>
+      </div>
+      ${miniBars(r)}
+      <p>${r.difGv!==null?`<span class="dif ${Math.abs(r.difGv)>state.f.tol?"dif-bad":"dif-ok"}">${pct(r.difGv)}</span> `:""}${esc(r.motivo)}</p>
+    </article>`).join("")}
+  </div>
+  ${pagerHtml(rs, pages)}`;
+  $("#sortSel").onchange = e => { const o = ORDENES[+e.target.value]; state.sort = {key:o[0], dir:o[1]}; ordenar(); state.page=0; renderTabla(); };
+  p.querySelectorAll(".card").forEach(c => {
+    const open = () => abrirVehiculo(state.filtered[+c.dataset.i].dominio, state.filtered[+c.dataset.i].periodo);
+    c.onclick = open; c.onkeydown = e => { if(e.key==="Enter" || e.key===" "){ e.preventDefault(); open(); } };
+  });
+  conectarPager();
+}
+function pagerHtml(rs, pages){
+  return `<div class="pager">
+    <span>${fmt(state.page*ROWS_PER_PAGE+1)}–${fmt(Math.min((state.page+1)*ROWS_PER_PAGE, rs.length))} de ${fmt(rs.length)}</span>
+    <button class="btn ghost" id="pgPrev" type="button" ${state.page===0?"disabled":""}>Anterior</button>
+    <button class="btn ghost" id="pgNext" type="button" ${state.page>=pages-1?"disabled":""}>Siguiente</button>
+  </div>`;
+}
+function conectarPager(){
+  const prev=$("#pgPrev"), next=$("#pgNext");
+  const ir = d => { state.page+=d; renderTabla(); $("#p-detalle").scrollIntoView({block:"start"}); };
+  if(prev) prev.onclick=()=>ir(-1);
+  if(next) next.onclick=()=>ir(1);
+}
+
 function renderTabla(){
   const p = $("#p-detalle"), rs = state.filtered;
   if(!rs.length){ p.innerHTML = `<div class="empty"><b>No hay vehículos-mes con estos filtros.</b>Ampliá el rango de meses o desmarcá “Solo desvíos”.</div>`; return; }
   const pages = Math.ceil(rs.length/ROWS_PER_PAGE); state.page = Math.min(state.page, pages-1);
   const slice = rs.slice(state.page*ROWS_PER_PAGE, (state.page+1)*ROWS_PER_PAGE);
+  if(esCelular()){ renderTarjetas(p, rs, slice, pages); return; }
   const th = (k, label, cls="") => `<th data-sort="${k}" class="${cls} ${state.sort.key===k?(state.sort.dir>0?"sorted-asc":"sorted-desc"):""}">${label}</th>`;
   p.innerHTML = `
   <div class="tablebox"><table>
@@ -458,11 +645,7 @@ function renderTabla(){
       </tr>`).join("")}
     </tbody>
   </table></div>
-  <div class="pager">
-    <span>${fmt(state.page*ROWS_PER_PAGE+1)}–${fmt(Math.min((state.page+1)*ROWS_PER_PAGE, rs.length))} de ${fmt(rs.length)}</span>
-    <button class="btn ghost" id="pgPrev" ${state.page===0?"disabled":""}>Anterior</button>
-    <button class="btn ghost" id="pgNext" ${state.page>=pages-1?"disabled":""}>Siguiente</button>
-  </div>`;
+  ${pagerHtml(rs, pages)}`;
   p.querySelectorAll("th[data-sort]").forEach(h => h.onclick = () => {
     const k=h.dataset.sort; state.sort = { key:k, dir: state.sort.key===k ? -state.sort.dir : (["dominio","periodo","zona","estado"].includes(k)?1:-1) };
     ordenar(); renderTabla();
@@ -471,9 +654,7 @@ function renderTabla(){
     const open = () => abrirVehiculo(state.filtered[+tr.dataset.i].dominio, state.filtered[+tr.dataset.i].periodo);
     tr.onclick = open; tr.onkeydown = e => { if(e.key==="Enter") open(); };
   });
-  const prev=$("#pgPrev"), next=$("#pgNext");
-  if(prev) prev.onclick=()=>{ state.page--; renderTabla(); };
-  if(next) next.onclick=()=>{ state.page++; renderTabla(); };
+  conectarPager();
 }
 
 function renderMatriz(){
@@ -543,9 +724,11 @@ async function abrirVehiculo(dom, mesSel){
   const comp = filas.filter(r=>r.km_gv!==null && r.km_gps!==null && r.km_ypf!==null && r.cobertura_ypf>=0.9);
   const s = k => comp.reduce((t,r)=>t+(r[k]||0),0);
   dr.innerHTML = `
-    <button class="btn ghost close" type="button" id="dClose">Cerrar</button>
-    <h2 id="dTitle">${esc(dom)}</h2>
-    <p class="meta">${esc([info.modelo, info.zona].filter(Boolean).join(", "))}${mesSel?`. Mes seleccionado: ${mesLabel(mesSel)}`:""}</p>
+    <div class="dhead">
+      <button class="btn ghost close" type="button" id="dClose">Cerrar</button>
+      <h2 id="dTitle">${esc(dom)}</h2>
+      <p class="meta">${esc([info.modelo, info.zona].filter(Boolean).join(", "))}${mesSel?`. Mes seleccionado: ${mesLabel(mesSel)}`:""}</p>
+    </div>
     <div class="vsum">
       <div style="--c:var(--gv)"><b>${fmt(s("km_gv"))}</b><span>Gestión, en ${comp.length} meses comparables</span></div>
       <div style="--c:var(--gps)"><b>${fmt(s("km_gps"))}</b><span>GPS, mismos meses</span></div>
@@ -554,14 +737,14 @@ async function abrirVehiculo(dom, mesSel){
     <h3>Km por mes según cada fuente</h3>
     <div class="chartbox"><canvas id="dChart" aria-label="Gráfico de km por mes"></canvas></div>
     <h3>Meses</h3>
-    <div class="tablebox"><table>
+    <div class="tablebox"><table class="stack">
       <thead><tr><th>Mes</th><th class="num c-gv">Gestión</th><th class="num c-gps">GPS</th><th class="num c-ypf">Odómetro</th><th class="num">Litros</th><th class="num">Km/L ref.</th><th>Estado</th></tr></thead>
       <tbody>${filas.slice().reverse().map(r=>`<tr style="cursor:default${r.periodo===mesSel?";outline:2px solid var(--focus);outline-offset:-2px":""}">
-        <td>${mesLabel(r.periodo)}</td><td class="num c-gv">${fmt(r.km_gv)}</td><td class="num c-gps">${fmt(r.km_gps)}</td>
-        <td class="num c-ypf">${fmt(r.km_ypf)}${r.km_ypf!==null?`<span class="cov">cubre ${fmt((r.cobertura_ypf||0)*100)} %</span>`:""}</td>
-        <td class="num">${fmt(r.litros_gps ?? r.litros_ypf ?? r.litros_gv,1)}</td>
-        <td class="num">${(()=>{const L=r.litros_gps ?? r.litros_ypf ?? r.litros_gv; return r.km_referencia>0 && L>0 ? fmt(r.km_referencia/L,1) : "—";})()}</td>
-        <td><span class="tag ${r.nivel}" title="${esc(r.motivo)}">${esc(r.estado)}</span></td></tr>`).join("")}</tbody>
+        <td data-l="Mes"><b>${mesLabel(r.periodo)}</b></td><td class="num c-gv" data-l="Gestión">${fmt(r.km_gv)}</td><td class="num c-gps" data-l="GPS">${fmt(r.km_gps)}</td>
+        <td class="num c-ypf" data-l="Odómetro">${fmt(r.km_ypf)}${r.km_ypf!==null?`<span class="cov">cubre ${fmt((r.cobertura_ypf||0)*100)} %</span>`:""}</td>
+        <td class="num" data-l="Litros">${fmt(r.litros_gps ?? r.litros_ypf ?? r.litros_gv,1)}</td>
+        <td class="num" data-l="Km/L ref.">${(()=>{const L=r.litros_gps ?? r.litros_ypf ?? r.litros_gv; return r.km_referencia>0 && L>0 ? fmt(r.km_referencia/L,1) : "—";})()}</td>
+        <td data-l="Estado"><span class="tag ${r.nivel}" title="${esc(r.motivo)}">${esc(r.estado)}</span></td></tr>`).join("")}</tbody>
     </table></div>
     <h3>Cargas de YPF y lectura de odómetro</h3>
     <div id="dLoads"><div class="loading" style="padding:20px 0">Cargando cargas…</div></div>`;
@@ -601,7 +784,7 @@ async function cargarCargas(dom){
     const ordenV = v.data.map(x=>({t:new Date(x.fecha).getTime(), o:Number(x.odo)})).sort((a,b)=>a.t-b.t);
     const kmDesdeAnterior = (odo) => { const i = ordenV.findIndex(x=>x.o===odo); return i>0 ? odo-ordenV[i-1].o : null; };
     if(!c.data.length){ box.innerHTML = `<div class="empty">No hay cargas de YPF registradas para esta patente.</div>`; return; }
-    box.innerHTML = `<div class="tablebox"><table class="loads">
+    box.innerHTML = `<div class="tablebox"><table class="loads stack">
       <thead><tr><th>Fecha</th><th class="num">Litros</th><th class="num">Odómetro</th><th class="num">Km desde la anterior</th><th>Lectura</th><th>Estación</th><th>Conductor</th></tr></thead>
       <tbody>${c.data.map(x=>{
         const odo = x.odometro===null ? null : Number(x.odometro);
@@ -613,12 +796,12 @@ async function cargarCargas(dom){
         else { estado="Fuera de secuencia"; cls="discard"; }
         const d = cls ? null : kmDesdeAnterior(odo);
         const f = new Date(x.fecha);
-        return `<tr class="${cls}"><td>${f.toLocaleDateString("es-AR")} ${f.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})}</td>
-          <td class="num">${fmt(x.litros,2)}</td><td class="num odo">${odo===null?"—":odo.toLocaleString("es-AR")}</td>
-          <td class="num">${d===null?"—":fmt(d)}</td>
-          <td><span class="tag ${cls?"mute":"ok"}">${estado}</span></td>
-          <td>${esc((x.establecimiento||"").replace(/^\d+\s*-\s*/,""))}<br><small style="color:var(--ink-3)">${esc(x.localidad||"")}</small></td>
-          <td>${esc(x.conductor||"")}</td></tr>`;
+        return `<tr class="${cls}"><td data-l="Fecha">${f.toLocaleDateString("es-AR")} ${f.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})}</td>
+          <td class="num" data-l="Litros">${fmt(x.litros,2)}</td><td class="num odo" data-l="Odómetro">${odo===null?"—":odo.toLocaleString("es-AR")}</td>
+          <td class="num" data-l="Km desde anterior">${d===null?"—":fmt(d)}</td>
+          <td data-l="Lectura"><span class="tag ${cls?"mute":"ok"}">${estado}</span></td>
+          <td data-l="Estación">${esc((x.establecimiento||"").replace(/^\d+\s*-\s*/,""))}<br><small style="color:var(--ink-3)">${esc(x.localidad||"")}</small></td>
+          <td data-l="Conductor">${esc(x.conductor||"")}</td></tr>`;
       }).join("")}</tbody></table></div>
       <p class="legend" style="margin-top:8px">“Fuera de secuencia” son lecturas que retroceden, se repiten durante semanas o implican más de 1.500 km por día. No se usan para calcular km.</p>`;
   }catch(e){
@@ -670,11 +853,24 @@ async function iniciar(){
   try{
     state.sb = window.supabase.createClient(url, key);
     const raw = await cargarTodo();
+    try { localStorage.setItem(LS_DATA, JSON.stringify({ t: Date.now(), rows: raw })); } catch(err){ /* sin espacio: se sigue sin copia local */ }
+    $("#offline")?.remove();
     preparar(raw);
     setConn("ok", `Actualizado ${new Date().toLocaleString("es-AR",{dateStyle:"short",timeStyle:"short"})}`);
     render();
   }catch(e){
     const m = String(e.message||e);
+    // Sin conexión: mostrar la última copia descargada, si existe
+    let copia = null;
+    try { copia = JSON.parse(localStorage.getItem(LS_DATA) || "null"); } catch(err){}
+    if(copia && copia.rows && copia.rows.length && (!navigator.onLine || /fetch|network|Failed/i.test(m))){
+      preparar(copia.rows);
+      const cuando = new Date(copia.t).toLocaleString("es-AR",{dateStyle:"short",timeStyle:"short"});
+      setConn("err", `Sin conexión, datos del ${cuando}`);
+      if(!$("#offline")) $("header.top").insertAdjacentHTML("afterend", `<div class="offline" id="offline" role="status">Sin conexión. Estás viendo los datos descargados el ${cuando}.</div>`);
+      render();
+      return;
+    }
     const ayuda = /v_km_conciliacion|does not exist|relation/i.test(m)
       ? "La vista v_km_conciliacion no existe todavía. Ejecutá supabase/conciliacion_km.sql en el SQL Editor de Supabase."
       : /JWT|apikey|Invalid API key|401/i.test(m) ? "La anon key no es válida para este proyecto." : m;
@@ -682,6 +878,33 @@ async function iniciar(){
   }
 }
 iniciar();
+window.addEventListener("online", () => { if($("#offline")) iniciar(); });
+
+/* ===================== Instalación como app ===================== */
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+const instalada = () => window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+let promptInstalar = null;
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault(); promptInstalar = e;
+  if(!instalada()) $("#btnInstall").hidden = false;
+});
+window.addEventListener("appinstalled", () => { $("#btnInstall").hidden = true; promptInstalar = null; });
+if(esIOS && !instalada()) $("#btnInstall").hidden = false;
+$("#btnInstall").onclick = async () => {
+  if(promptInstalar){
+    promptInstalar.prompt();
+    const r = await promptInstalar.userChoice;
+    if(r.outcome === "accepted") $("#btnInstall").hidden = true;
+    promptInstalar = null;
+  } else if(esIOS){
+    $("#iosSheet").hidden = false; $("#iosScrim").hidden = false; $("#iosOk").focus();
+  }
+};
+const cerrarIos = () => { $("#iosSheet").hidden = true; $("#iosScrim").hidden = true; };
+$("#iosOk").onclick = cerrarIos; $("#iosScrim").onclick = cerrarIos;
 </script>
 </body>
 </html>
