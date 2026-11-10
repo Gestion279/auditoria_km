@@ -17,7 +17,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&display=swap" rel="stylesheet">
-<script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
@@ -303,7 +302,7 @@ td.why{color:var(--ink-2);font-size:12.5px;max-width:320px}
     </div>
     <div class="hright">
       <button class="btn install" id="btnInstall" type="button" hidden>Instalar app</button>
-      <div class="conn" id="conn"><span class="dot"></span><span id="connText">Sin conectar</span><button class="linkbtn" id="btnConfig" type="button">Cambiar conexión</button></div>
+      <div class="conn" id="conn"><span class="dot"></span><span id="connText">Sin conectar</span></div>
     </div>
   </div>
 </header>
@@ -324,7 +323,10 @@ td.why{color:var(--ink-2);font-size:12.5px;max-width:320px}
 <script>
 "use strict";
 /* ===================== Configuración y estado ===================== */
-const CFG = window.APP_CONFIG || {};
+/* Conexión del proyecto, fija para todos los usuarios */
+const SUPABASE_URL = "https://oixzkvkybqexvrzwzwis.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9peHprdmt5YnFleHZyend6d2lzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4NTUxNzEsImV4cCI6MjEwNDQzMTE3MX0.BTghtY8mZkyrK2y-kZXMb1aIecptX3OHOpNFqUBMzP4";
+const CFG = { TOLERANCIA_PCT: 15 };   // tolerancia inicial para marcar desvíos, en %
 const LS_KEY = "auditoria_km_conexion";
 const LS_DATA = "auditoria_km_datos";
 const PAGE = 1000, ROWS_PER_PAGE = 100;
@@ -345,13 +347,7 @@ const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov"
 const mesLabel = p => { if(!p) return "—"; const [y,m] = p.split("-"); return `${MESES[+m-1]} ${y.slice(2)}`; };
 const pct = v => v===null || v===undefined ? "—" : Math.abs(v)>999 ? (v>0?"> +999 %":"< −999 %") : (v>0?"+":"") + fmt(v,1) + " %";
 
-function conexion(){
-  let saved = {};
-  try { saved = JSON.parse(localStorage.getItem(LS_KEY) || "{}"); } catch(e){}
-  const url = saved.url || CFG.SUPABASE_URL || "";
-  const key = saved.key || (CFG.SUPABASE_ANON_KEY && CFG.SUPABASE_ANON_KEY !== "PEGAR_ACA_TU_ANON_KEY" ? CFG.SUPABASE_ANON_KEY : "");
-  return { url, key };
-}
+function conexion(){ return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY }; }
 function setConn(cls, text){ const c=$("#conn"); c.className="conn "+(cls||""); $("#connText").textContent=text; }
 
 /* ===================== Carga de datos ===================== */
@@ -438,14 +434,44 @@ function preparar(raw){
   }));
   state.zonas = [...new Set(state.rows.map(r=>r.zona))].sort();
   state.periodos = [...new Set(state.rows.map(r=>r.periodo))].sort();
-  // Por defecto, los últimos 12 meses que tienen datos de Gestión
-  const conGv = [...new Set(state.rows.filter(r=>r.km_gv!==null).map(r=>r.periodo))].sort();
-  const ult = conGv.length ? conGv : state.periodos;
-  state.f.hasta = ult[ult.length-1] || "";
-  state.f.desde = ult[Math.max(0, ult.length-12)] || "";
+  // Por defecto: el período en el que están disponibles las tres fuentes
+  const comun = periodoComun();
+  if(comun){
+    state.f.desde = comun.desde; state.f.hasta = comun.hasta;
+  } else {
+    // Si no hay meses con las tres fuentes, últimos 12 meses con datos de Gestión
+    const conGv = [...new Set(state.rows.filter(r=>r.km_gv!==null).map(r=>r.periodo))].sort();
+    const ult = conGv.length ? conGv : state.periodos;
+    state.f.hasta = ult[ult.length-1] || "";
+    state.f.desde = ult[Math.max(0, ult.length-12)] || "";
+  }
+  state.comun = comun;
   state.defaults = { desde:state.f.desde, hasta:state.f.hasta, tol:state.f.tol };
   reclasificar();
 }
+/* Meses en los que las tres fuentes tienen datos para la flota.
+   Un mes cuenta para una fuente si tiene datos de al menos la mitad de los
+   vehículos que esa fuente informa en un mes típico. Así no cuentan meses
+   con datos sueltos ni el mes en curso, todavía incompleto. */
+function periodoComun(){
+  const fuentes = {
+    gv:  r => r.km_gv !== null,
+    gps: r => r.km_gps !== null,
+    ypf: r => r.km_ypf !== null && r.cobertura_ypf >= 0.9
+  };
+  const disponible = {};
+  for(const [k, tiene] of Object.entries(fuentes)){
+    const porMes = {};
+    state.rows.forEach(r => { if(tiene(r)) porMes[r.periodo] = (porMes[r.periodo]||0) + 1; });
+    const cuentas = Object.values(porMes).sort((a,b)=>a-b);
+    if(!cuentas.length) return null;
+    const mediana = cuentas[Math.floor(cuentas.length/2)];
+    disponible[k] = new Set(Object.keys(porMes).filter(m => porMes[m] >= mediana*0.5));
+  }
+  const meses = state.periodos.filter(m => disponible.gv.has(m) && disponible.gps.has(m) && disponible.ypf.has(m));
+  return meses.length ? { desde: meses[0], hasta: meses[meses.length-1] } : null;
+}
+
 function reclasificar(){ state.rows.forEach(r => clasificar(r, state.f.tol)); aplicarFiltros(); }
 
 function aplicarFiltros(){
@@ -551,7 +577,7 @@ function renderResumen(){
       ${lane("gv",'<span class="long">Gestión Vehicular</span><span class="short">Gestión</span>','<span class="long">Km recorridos</span>', tGv)}
       ${lane("gps","GPS",'<span class="long">Distancia</span>', tGps)}
       ${lane("ypf",'<span class="long">Odómetro YPF</span><span class="short">Odómetro</span>','<span class="long">Diferencia entre cargas</span>', tYpf)}
-      <p class="note">${comp.length ? `Km totales de los ${fmt(comp.length)} vehículos-mes que tienen las tres fuentes completas. Gestión ${pct(tGps?(tGv-tGps)/tGps*100:null)} y odómetro ${pct(tGps?(tYpf-tGps)/tGps*100:null)} respecto del GPS.` : "En la selección no hay meses con las tres fuentes completas para comparar totales."}</p>
+      <p class="note">${state.comun && state.f.desde===state.comun.desde && state.f.hasta===state.comun.hasta ? `Período con datos de las tres fuentes: ${mesLabel(state.comun.desde)} a ${mesLabel(state.comun.hasta)}. ` : ""}${comp.length ? `Km totales de los ${fmt(comp.length)} vehículos-mes que tienen las tres fuentes completas. Gestión ${pct(tGps?(tGv-tGps)/tGps*100:null)} y odómetro ${pct(tGps?(tYpf-tGps)/tGps*100:null)} respecto del GPS.` : "En la selección no hay meses con las tres fuentes completas para comparar totales."}</p>
     </div>
     <div class="counts">
       <div class="count"><b>${fmt(rs.length)}</b><span>Vehículos-mes en la selección</span></div>
@@ -825,33 +851,41 @@ function exportarCsv(){
 }
 
 /* ===================== Conexión ===================== */
-function pantallaConexion(msg){
-  const {url,key} = conexion();
-  setConn("err", "Sin conectar");
-  $("#app").innerHTML = `<form class="setup" id="setup">
-    <h2>Conectar con Supabase</h2>
-    <p>La app lee las vistas de conciliación de tu proyecto. Usá la clave pública anon, la misma que usa el dashboard de Gestión Vehicular. Queda guardada solo en este navegador.</p>
-    <label for="sUrl">URL del proyecto</label><input id="sUrl" value="${esc(url)}" required>
-    <label for="sKey">Anon public key</label><input id="sKey" value="${esc(key)}" required autocomplete="off">
-    ${msg?`<p class="err">${esc(msg)}</p>`:""}
-    <p><button class="btn" type="submit">Conectar</button></p>
-  </form>`;
-  $("#setup").onsubmit = e => {
-    e.preventDefault();
-    localStorage.setItem(LS_KEY, JSON.stringify({url:$("#sUrl").value.trim(), key:$("#sKey").value.trim()}));
-    iniciar();
-  };
+// La conexión es la del proyecto para todos: se borra cualquier conexión guardada a mano antes
+try { localStorage.removeItem(LS_KEY); } catch(e){}
+
+/* fetch compatible: convierte los encabezados en un objeto simple.
+   Algunos navegadores, extensiones y visores que reenvían las consultas
+   con postMessage no pueden copiar un objeto Headers ni un AbortSignal
+   ("DataCloneError: Headers object could not be cloned"). */
+function fetchCompatible(input, init = {}){
+  const opts = Object.assign({}, init);
+  if(opts.headers && typeof opts.headers.forEach === "function" && !Array.isArray(opts.headers)){
+    const h = {}; opts.headers.forEach((v, k) => { h[k] = v; }); opts.headers = h;
+  }
+  delete opts.signal;
+  return fetch(typeof input === "string" ? input : (input.url || String(input)), opts);
 }
-$("#btnConfig").onclick = () => pantallaConexion();
+
+function pantallaError(titulo, detalle){
+  setConn("err", "Sin datos");
+  $("#app").innerHTML = `<div class="empty" style="margin-top:30px">
+    <b>${esc(titulo)}</b>${esc(detalle)}
+    <p style="margin-top:16px"><button class="btn" type="button" id="btnReintentar">Reintentar</button></p>
+  </div>`;
+  $("#btnReintentar").onclick = iniciar;
+}
 
 async function iniciar(){
   const {url,key} = conexion();
-  if(!url || !key){ pantallaConexion(); return; }
-  if(!window.supabase){ pantallaConexion("No se pudo cargar la librería de Supabase. Revisá la conexión a internet."); return; }
-  $("#app").innerHTML = `<div class="loading">Cargando datos de Supabase…</div>`;
+  if(!window.supabase){ pantallaError("No se pudo cargar la app.", "Revisá la conexión a internet y volvé a intentar."); return; }
+  if(!state.rows.length) $("#app").innerHTML = `<div class="loading">Cargando datos de Supabase…</div>`;
   setConn("", "Conectando…");
   try{
-    state.sb = window.supabase.createClient(url, key);
+    state.sb = window.supabase.createClient(url, key, {
+      auth: { persistSession:false, autoRefreshToken:false, detectSessionInUrl:false },
+      global: { fetch: fetchCompatible }
+    });
     const raw = await cargarTodo();
     try { localStorage.setItem(LS_DATA, JSON.stringify({ t: Date.now(), rows: raw })); } catch(err){ /* sin espacio: se sigue sin copia local */ }
     $("#offline")?.remove();
@@ -859,22 +893,34 @@ async function iniciar(){
     setConn("ok", `Actualizado ${new Date().toLocaleString("es-AR",{dateStyle:"short",timeStyle:"short"})}`);
     render();
   }catch(e){
-    const m = String(e.message||e);
-    // Sin conexión: mostrar la última copia descargada, si existe
+    const m = String((e && (e.message || e.details)) || e);
+    console.error("Auditoría de km:", e);
+
+    const keyInvalida = /JWT|apikey|Invalid API key|401|No API key/i.test(m);
+
+    // Si hay una copia descargada antes, se muestra con un aviso
     let copia = null;
     try { copia = JSON.parse(localStorage.getItem(LS_DATA) || "null"); } catch(err){}
-    if(copia && copia.rows && copia.rows.length && (!navigator.onLine || /fetch|network|Failed/i.test(m))){
+    if(copia && copia.rows && copia.rows.length){
       preparar(copia.rows);
       const cuando = new Date(copia.t).toLocaleString("es-AR",{dateStyle:"short",timeStyle:"short"});
-      setConn("err", `Sin conexión, datos del ${cuando}`);
-      if(!$("#offline")) $("header.top").insertAdjacentHTML("afterend", `<div class="offline" id="offline" role="status">Sin conexión. Estás viendo los datos descargados el ${cuando}.</div>`);
+      setConn("err", `Datos del ${cuando}`);
+      const texto = navigator.onLine ? `No se pudo actualizar desde Supabase. Estás viendo los datos descargados el ${cuando}.` : `Sin conexión. Estás viendo los datos descargados el ${cuando}.`;
+      $("#offline")?.remove();
+      $("header.top").insertAdjacentHTML("afterend", `<div class="offline" id="offline" role="status">${texto} <button class="linkbtn" type="button" id="btnRetry">Reintentar</button></div>`);
+      $("#btnRetry").onclick = iniciar;
       render();
       return;
     }
-    const ayuda = /v_km_conciliacion|does not exist|relation/i.test(m)
-      ? "La vista v_km_conciliacion no existe todavía. Ejecutá supabase/conciliacion_km.sql en el SQL Editor de Supabase."
-      : /JWT|apikey|Invalid API key|401/i.test(m) ? "La anon key no es válida para este proyecto." : m;
-    pantallaConexion(ayuda);
+
+    if(/v_km_conciliacion|does not exist|relation|PGRST20[05]/i.test(m))
+      pantallaError("Faltan las vistas de conciliación en Supabase.", "Ejecutá supabase/conciliacion_km.sql en el SQL Editor del proyecto y volvé a intentar.");
+    else if(keyInvalida)
+      pantallaError("La clave del proyecto no es válida.", "Revisá SUPABASE_ANON_KEY al comienzo del script en index.html.");
+    else if(!navigator.onLine || /Failed to fetch|NetworkError|network/i.test(m))
+      pantallaError("No hay conexión con Supabase.", "Revisá la conexión a internet y volvé a intentar.");
+    else
+      pantallaError("No se pudieron cargar los datos.", m);
   }
 }
 iniciar();

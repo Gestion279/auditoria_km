@@ -1,12 +1,12 @@
 /* Service worker — Auditoría de km
-   - La app (HTML, config, íconos) se guarda para abrir sin conexión.
-   - index.html y config.js se piden primero a la red, para tomar siempre la última versión.
+   - La app (HTML e íconos) se guarda para abrir sin conexión.
+   - index.html se pide primero a la red, para tomar siempre la última versión.
    - Librerías y tipografías de CDN se sirven desde caché y se actualizan en segundo plano.
    - Las consultas a Supabase nunca se guardan acá: la app guarda su propia copia de los últimos datos.
    Al publicar cambios grandes, subí el número de VERSION. */
-const VERSION = "auditoria-km-v1";
+const VERSION = "auditoria-km-v6";
 const SHELL = [
-  "./", "./index.html", "./config.js", "./manifest.webmanifest",
+  "./", "./index.html", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png", "./icons/favicon-64.png"
 ];
 const CDN = ["cdn.jsdelivr.net", "cdnjs.cloudflare.com", "fonts.googleapis.com", "fonts.gstatic.com"];

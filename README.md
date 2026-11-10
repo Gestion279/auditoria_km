@@ -49,6 +49,8 @@ El **km de referencia** de cada mes es el del GPS. Se reemplaza por el odómetro
 
 La tolerancia (15 % por defecto) se ajusta en pantalla.
 
+Al abrir, el período queda seleccionado en los meses en que están disponibles las tres fuentes. Un mes cuenta para una fuente si tiene datos de al menos la mitad de los vehículos que esa fuente informa en un mes típico, así no se toman meses con datos sueltos ni el mes en curso todavía incompleto. El rango se puede cambiar desde los filtros.
+
 ### Limpieza del odómetro de YPF
 
 Las vistas descartan lecturas de relleno (1234, 12345, 123123…), odómetros congelados que se repiten durante semanas, retrocesos y saltos de más de 1.500 km por día. Cada tramo entre dos cargas válidas se reparte entre los meses según los días. Los tramos de más de 62 días no se usan. Por cómo caen las cargas, el km mensual del odómetro tiene un margen de ±10 %.
@@ -63,11 +65,9 @@ Las vistas descartan lecturas de relleno (1234, 12345, 123123…), odómetros co
 
 Las vistas usan `security_invoker`, así que respetan las políticas RLS de las tablas de origen: la app ve exactamente lo que la anon key ya puede leer en esas tablas.
 
-### 2. Configurar la conexión
+### 2. Conexión
 
-En `config.js`, reemplazá `PEGAR_ACA_TU_ANON_KEY` por la **anon public key**, la misma que está en `indicadores_gv/config.js`. Nunca uses la `service_role`.
-
-Si preferís no dejarla en el repositorio, dejá el valor de ejemplo: la app pide la key al abrirse y la guarda solo en ese navegador.
+La URL del proyecto y la anon public key están fijas al comienzo del script de `index.html` (`SUPABASE_URL` y `SUPABASE_ANON_KEY`). Todos los usuarios entran directo, sin configurar nada. Si algún día cambia la key, se edita ahí. Nunca uses la `service_role`.
 
 ### 3. Publicar
 
@@ -86,8 +86,7 @@ Después importá el repositorio en Vercel (o activá GitHub Pages). No requiere
 
 | Archivo | Qué es |
 |---|---|
-| `index.html` | La aplicación completa |
-| `config.js` | URL de Supabase, anon key y tolerancia inicial |
+| `index.html` | La aplicación completa, con la conexión al proyecto |
 | `manifest.webmanifest` | Nombre, colores e íconos para instalarla como app |
 | `sw.js` | Service worker: permite instalarla y abrirla sin conexión |
 | `icons/` | Íconos de la app |
