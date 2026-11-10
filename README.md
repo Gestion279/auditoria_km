@@ -16,6 +16,7 @@ Es HTML y JavaScript puro, sin build, igual que `indicadores_gv` y `gps_resumen_
 - **Matriz por vehículo**: patentes × meses coloreadas según el resultado, con los vehículos más problemáticos arriba.
 - **Desvíos por tipo**: los casos agrupados por tipo de problema.
 - **Detalle de vehículo** (clic en cualquier fila o celda): gráfico de las tres fuentes mes a mes y todas las cargas de YPF con su odómetro, marcando cuáles se usaron y cuáles se descartaron.
+- **Registros con más de 15.000 km**: aviso arriba de todo con el total de registros que superan ese máximo en cada base. En Gestión y GPS se cuentan los meses con más de 15.000 km; en YPF, las cargas cuyo odómetro salta más de 15.000 km respecto de la carga anterior del mismo vehículo. Cada base tiene su detalle desplegable con la tabla donde corregir el dato. Esos registros no se modifican en Supabase: se muestran con su valor original y no se usan en los totales ni como referencia. El máximo se cambia en la constante `MAX_KM_REGISTRO` de `index.html`.
 - **Exportar CSV** con lo filtrado, listo para abrir en Excel (separador `;` y coma decimal).
 - **Uso en celular**: en pantallas chicas la tabla se convierte en tarjetas, los filtros se pliegan detrás del botón "Filtros" y el detalle de vehículo ocupa toda la pantalla.
 - **Instalable como app** en Android, iPhone y computadora, con ícono propio y ventana sin barra del navegador.
@@ -37,6 +38,7 @@ El **km de referencia** de cada mes es el del GPS. Se reemplaza por el odómetro
 
 | Estado | Significado |
 |---|---|
+| Más de 15.000 km | Gestión o GPS informan más de 15.000 km en el mes. Error de carga; no se usa en totales. |
 | Imposible | Los km de Gestión darían más de 30 km por litro. Suele ser el odómetro cargado como km. |
 | Litros sin km | Gestión tiene litros pero menos de 50 km. |
 | Falta en Gestión | El GPS u odómetro registran recorrido y Gestión no. |

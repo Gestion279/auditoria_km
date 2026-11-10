@@ -185,6 +185,38 @@ td.why{color:var(--ink-2);font-size:12.5px;max-width:320px}
 .hright{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .btn.install{height:34px}
 .btn:disabled{opacity:.4;cursor:default}
+.kmalert{padding:4px 0 18px;border-bottom:1px solid var(--rule)}
+.kmhead{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px}
+.kmhead b{display:block;font-size:16px}
+.kmhead span{color:var(--ink-2);font-size:13px}
+.kmicon{flex:0 0 26px;height:26px;border-radius:50%;display:inline-flex !important;align-items:center;justify-content:center;font-weight:800;background:var(--ok-bg);color:var(--ok) !important;font-size:14px !important}
+.kmhead.hay b{color:var(--bad)}
+.kmhead.hay .kmicon{background:var(--bad);color:#fff !important}
+.kmgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start}
+.kmc{min-width:0;background:var(--surface);border:1px solid var(--rule);border-top:4px solid var(--c);border-radius:4px}
+.kmc.gv{--c:var(--gv)} .kmc.gps{--c:var(--gps)} .kmc.ypf{--c:var(--ypf)}
+.kmsum{display:flex;align-items:center;gap:12px;padding:12px 14px;list-style:none}
+summary.kmsum{cursor:pointer}
+summary.kmsum::-webkit-details-marker{display:none}
+.kmn{font-size:30px;font-weight:700;font-stretch:80%;font-variant-numeric:tabular-nums;min-width:40px;line-height:1}
+.kmc.hay .kmn{color:var(--bad)}
+.kmc.cero .kmn{color:var(--ok)}
+.kmn.mute{color:var(--ink-3)}
+.kmt{font-size:12.5px;color:var(--ink-2);flex:1}
+.kmt b{display:block;color:var(--ink);font-size:14.5px}
+.kmver{font-size:12.5px;color:var(--gps);font-weight:600;white-space:nowrap}
+.kmver .t-ocultar{display:none}
+details[open] .kmver .t-ver{display:none}
+details[open] .kmver .t-ocultar{display:inline}
+.kmver::after{content:" ▾"} details[open] .kmver::after{content:" ▴"}
+.kmbody{border-top:1px solid var(--rule);padding:8px 14px 12px}
+.kmbody p{margin:0 0 8px;font-size:12.5px;color:var(--ink-2)}
+.kmbody code{font-size:12px;background:var(--sunken);padding:1px 4px;border-radius:3px}
+.kmlist{max-height:260px;overflow:auto}
+.kmlist table{font-size:12.5px}
+.kmlist th{cursor:default;padding:6px 8px}
+.kmlist td{padding:6px 8px}
+.kmlist td small{color:var(--ink-3);display:block;font-size:11px}
 .offline{background:var(--warn-bg);color:var(--warn);font-size:13.5px;padding:8px 20px;text-align:center}
 .fbar{display:contents}
 .fmore{display:contents}
@@ -212,6 +244,7 @@ td.why{color:var(--ink-2);font-size:12.5px;max-width:320px}
 .sheet h2{margin:0 0 8px;font-size:20px;font-stretch:80%}
 .sheet p{color:var(--ink-2);margin:0 0 16px}
 #iosScrim{z-index:30}
+@media (max-width:900px){ .kmgrid{grid-template-columns:minmax(0,1fr)} }
 @media (max-width:900px){
   .summary{grid-template-columns:1fr}
   .lane{grid-template-columns:110px 1fr 90px}
@@ -247,6 +280,11 @@ td.why{color:var(--ink-2);font-size:12.5px;max-width:320px}
   .fmore .spacer{display:none}
 
   .summary{gap:16px;padding:12px 0 16px}
+  .kmgrid{grid-template-columns:minmax(0,1fr);gap:8px}
+  .kmsum{gap:10px}
+  .kmver{font-size:12px}
+  .kmsum{padding:10px 12px}
+  .kmn{font-size:24px}
   .lane{grid-template-columns:78px 1fr auto;gap:8px}
   .lane .name{font-size:12px} .lane .name b{font-size:14px}
   .lane .track{height:10px}
@@ -331,13 +369,17 @@ const LS_KEY = "auditoria_km_conexion";
 const LS_DATA = "auditoria_km_datos";
 const PAGE = 1000, ROWS_PER_PAGE = 100;
 const MIN_KM_ACTIVIDAD = 50;          // por debajo, el mes se considera sin actividad
+// Ningún vehículo de la flota recorre esto en un mes ni entre dos cargas:
+// cualquier registro por encima es un error de carga (dígito de más, odómetro mal tipeado).
+// Se avisa y se deja fuera de los totales, pero nunca se modifica en Supabase.
+const MAX_KM_REGISTRO = 15000;
 const MAX_KM_POR_LITRO = 30;          // por encima, los km son imposibles para los litros
 const RELLENO = new Set([1234,12345,123456,123123,1515,2500,5000,10000,11111,99999]);
 
 const state = {
   sb:null, rows:[], filtered:[], zonas:[], periodos:[],
   f:{ desde:"", hasta:"", zona:"", q:"", tol:Number(CFG.TOLERANCIA_PCT)||15, soloDesvios:false, sinActividad:false },
-  sort:{ key:"severidad", dir:-1 }, page:0, tab:"detalle", chart:null
+  sort:{ key:"severidad", dir:-1 }, ypfSaltos:[], ypfError:null, page:0, tab:"detalle", chart:null
 };
 
 const $ = (s, r=document) => r.querySelector(s);
@@ -366,6 +408,36 @@ async function cargarTodo(){
 
 const n = v => v===null || v===undefined ? null : Number(v);
 
+/* Saltos de odómetro entre cargas consecutivas de YPF (datos crudos, sin limpiar).
+   Una carga es alerta si el odómetro avanza más de MAX_KM_REGISTRO desde la carga anterior. */
+async function cargarSaltosYpf(){
+  const out = [];
+  for(let from=0; ; from+=PAGE){
+    const { data, error } = await state.sb.from("ypf_consumos").select("fecha,vehiculo_dominio,odometro,es_combustible")
+      .order("vehiculo_dominio",{ascending:true}).order("fecha",{ascending:true}).range(from, from+PAGE-1);
+    if(error) throw error;
+    out.push(...data);
+    if(data.length < PAGE) break;
+  }
+  return calcularSaltos(out);
+}
+function calcularSaltos(cargas){
+  const saltos = []; let prev = null;
+  const clave = c => String(c.vehiculo_dominio||"").toUpperCase().replace(/\s/g,"");
+  cargas = cargas.slice().sort((a,b) => clave(a).localeCompare(clave(b)) || new Date(a.fecha) - new Date(b.fecha));
+  cargas.forEach(c => {
+    const odo = c.odometro===null || c.odometro===undefined ? null : Number(c.odometro);
+    if(c.es_combustible===false || odo===null || !(odo>0)) return;
+    const dom = String(c.vehiculo_dominio||"").toUpperCase().replace(/\s/g,"");
+    if(prev && prev.dom===dom && odo - prev.odo > MAX_KM_REGISTRO){
+      saltos.push({ dominio:dom, fecha:c.fecha, periodo:String(c.fecha).slice(0,7),
+                    fechaAnterior:prev.fecha, anterior:prev.odo, actual:odo, km:odo-prev.odo });
+    }
+    prev = { dom, odo, fecha:c.fecha };
+  });
+  return saltos;
+}
+
 /* Clasificación de cada vehículo-mes. Se recalcula al mover la tolerancia. */
 function clasificar(r, tol){
   const t = tol/100;
@@ -376,6 +448,15 @@ function clasificar(r, tol){
   r.difGpsYpf = (cubre && ypf>0 && gps!==null) ? (gps-ypf)/ypf*100 : null;
   const actividad = Math.max(gv||0, gps||0, (cubre?ypf:0)||0, 0) >= MIN_KM_ACTIVIDAD || (r.litros_ypf||0)>0 || litrosGv>0;
   r.fuenteRef = ref===null ? null : (ref===gps ? "GPS" : (ref===ypf ? "YPF" : "GPS"));
+  const excesos = [];
+  if(gv  > MAX_KM_REGISTRO) excesos.push(`Gestión ${fmt(gv)} km`);
+  if(gps > MAX_KM_REGISTRO) excesos.push(`GPS ${fmt(gps)} km`);
+  r.excede = excesos.length > 0;
+  if(r.excede){
+    r.estado = "Más de 15.000 km"; r.nivel = "bad"; r.sev = 6;
+    r.motivo = `${excesos.join(" y ")} en un mes. Supera el máximo de ${fmt(MAX_KM_REGISTRO)} km: es un error de carga y no se usa en los totales.`;
+    return r;
+  }
 
   if(!actividad){ r.estado="Sin actividad"; r.nivel="mute"; r.motivo="Ninguna fuente registra recorrido."; r.sev=0; return r; }
   if(gv>0 && litrosGv>0 && gv/litrosGv>MAX_KM_POR_LITRO){
@@ -509,6 +590,7 @@ function render(){
     return;
   }
   if(!$("#filters")) armarEsqueleto();
+  renderAlertaKm();
   renderResumen();
   if(state.tab==="detalle") renderTabla();
   if(state.tab==="matriz") renderMatriz();
@@ -534,6 +616,7 @@ function armarEsqueleto(){
       <button class="btn ghost" id="btnCsv" type="button">Exportar CSV</button>
     </div>
   </section>
+  <section class="kmalert" id="kmalert" aria-label="Registros con más de 15.000 km"></section>
   <section class="summary" id="summary" aria-label="Resumen"></section>
   <nav class="tabs" role="tablist">
     <button class="tab" role="tab" data-tab="detalle" aria-selected="true"><span class="long">Vehículo y mes</span><span class="short">Lista</span></button>
@@ -564,10 +647,60 @@ function armarEsqueleto(){
   });
 }
 
+/* ===================== Alerta: registros con más de 15.000 km ===================== */
+function renderAlertaKm(){
+  const box = $("#kmalert"); if(!box) return;
+  const f = state.f, q = f.q.trim().toUpperCase().replace(/\s/g,"");
+  const zonaDe = {}; state.rows.forEach(r => { if(r.zona && r.zona!=="Sin zona") zonaDe[r.dominio] = r.zona; });
+  const enFiltro = (dom, per) => (!f.desde || per>=f.desde) && (!f.hasta || per<=f.hasta) &&
+    (!f.zona || (zonaDe[dom]||"Sin zona")===f.zona) && (!q || dom.includes(q));
+  const base = state.rows.filter(r => enFiltro(r.dominio, r.periodo));
+  const gv  = base.filter(r => r.km_gv  > MAX_KM_REGISTRO).sort((a,b)=>b.km_gv-a.km_gv);
+  const gps = base.filter(r => r.km_gps > MAX_KM_REGISTRO).sort((a,b)=>b.km_gps-a.km_gps);
+  const ypf = state.ypfSaltos.filter(x => enFiltro(x.dominio, x.periodo)).sort((a,b)=>b.km-a.km);
+  const total = gv.length + gps.length + (state.ypfError ? 0 : ypf.length);
+  const fecha = d => { const x = new Date(d); return isNaN(x) ? esc(d) : x.toLocaleDateString("es-AR"); };
+
+  const tarjeta = (cls, nombre, que, lista, tabla, origen, error) => {
+    const nn = lista.length;
+    if(error) return `<div class="kmc ${cls}"><div class="kmsum"><span class="kmn mute">—</span><span class="kmt"><b>${nombre}</b>No se pudieron leer los datos: ${esc(error)}</span></div></div>`;
+    if(!nn) return `<div class="kmc ${cls} cero"><div class="kmsum"><span class="kmn">0</span><span class="kmt"><b>${nombre}</b>Ningún registro supera ${fmt(MAX_KM_REGISTRO)} km ${que}.</span></div></div>`;
+    return `<details class="kmc ${cls} hay">
+      <summary class="kmsum"><span class="kmn">${fmt(nn)}</span><span class="kmt"><b>${nombre}</b>${nn===1?"registro supera":"registros superan"} ${fmt(MAX_KM_REGISTRO)} km ${que}.</span>
+        <span class="kmver"><span class="t-ver">Ver detalle</span><span class="t-ocultar">Ocultar</span></span></summary>
+      <div class="kmbody"><p>${origen}</p><div class="kmlist">${tabla}</div></div>
+    </details>`;
+  };
+  const fila = (dom, per, celdas) => `<tr data-d="${esc(dom)}" data-m="${per}" tabindex="0">${celdas}</tr>`;
+
+  const tGv = `<table><thead><tr><th>Patente</th><th>Mes</th><th class="num">Km cargados</th><th class="num">Litros</th></tr></thead><tbody>${
+    gv.map(r=>fila(r.dominio, r.periodo, `<td class="pat">${esc(r.dominio)}</td><td>${mesLabel(r.periodo)}</td><td class="num dif-bad">${fmt(r.km_gv)}</td><td class="num">${fmt(r.litros_gv,1)}</td>`)).join("")}</tbody></table>`;
+  const tGps = `<table><thead><tr><th>Patente</th><th>Mes</th><th class="num">Km informados</th><th class="num">Horas motor</th></tr></thead><tbody>${
+    gps.map(r=>fila(r.dominio, r.periodo, `<td class="pat">${esc(r.dominio)}</td><td>${mesLabel(r.periodo)}</td><td class="num dif-bad">${fmt(r.km_gps)}</td><td class="num">${fmt(r.horas_motor,1)}</td>`)).join("")}</tbody></table>`;
+  const tYpf = `<table><thead><tr><th>Patente</th><th>Fecha</th><th class="num">Salto</th><th class="num">Odómetro anterior → actual</th></tr></thead><tbody>${
+    ypf.map(x=>fila(x.dominio, x.periodo, `<td class="pat">${esc(x.dominio)}</td><td>${fecha(x.fecha)}</td><td class="num dif-bad">${fmt(x.km)}</td><td class="num">${x.anterior.toLocaleString("es-AR")} → ${x.actual.toLocaleString("es-AR")}<small>carga anterior: ${fecha(x.fechaAnterior)}</small></td>`)).join("")}</tbody></table>`;
+
+  box.innerHTML = `
+    <div class="kmhead ${total?"hay":""}">
+      <span class="kmicon" aria-hidden="true">${total?"!":"✓"}</span>
+      <div><b>${total ? `${fmt(total)} ${total===1?"registro":"registros"} con más de ${fmt(MAX_KM_REGISTRO)} km` : `Sin registros con más de ${fmt(MAX_KM_REGISTRO)} km`}</b>
+      <span>Ningún vehículo de la flota recorre esa distancia en un mes ni entre dos cargas: son errores de carga a corregir en el origen. Se muestran con su valor original y no se usan en los totales.</span></div>
+    </div>
+    <div class="kmgrid">
+      ${tarjeta("gv","Gestión Vehicular","en un mes", gv, tGv, "Corregir el km del mes en la planilla de Gestión Vehicular (tabla <code>gv_indicadores_mensuales</code>).")}
+      ${tarjeta("gps","GPS","en un mes", gps, tGps, "Corregir la distancia en el reporte del GPS (tabla <code>gps_reportes</code>).")}
+      ${tarjeta("ypf","Odómetro YPF","entre dos cargas", ypf, tYpf, "Odómetro mal tipeado en el surtidor (tabla <code>ypf_consumos</code>). Estas lecturas no se usan para calcular km.", state.ypfError)}
+    </div>`;
+  box.querySelectorAll("tr[data-d]").forEach(tr => {
+    const open = () => abrirVehiculo(tr.dataset.d, tr.dataset.m);
+    tr.onclick = open; tr.onkeydown = e => { if(e.key==="Enter") open(); };
+  });
+}
+
 function renderResumen(){
   const rs = state.filtered;
   // Totales comparables: solo meses donde las tres fuentes tienen dato (YPF con cobertura completa)
-  const comp = rs.filter(r => r.km_gv!==null && r.km_gps!==null && r.km_ypf!==null && r.cobertura_ypf>=0.9);
+  const comp = rs.filter(r => !r.excede && r.km_gv!==null && r.km_gps!==null && r.km_ypf!==null && r.cobertura_ypf>=0.9);
   const tGv = comp.reduce((s,r)=>s+(r.km_gv||0),0), tGps = comp.reduce((s,r)=>s+(r.km_gps||0),0), tYpf = comp.reduce((s,r)=>s+(r.km_ypf||0),0);
   const mx = Math.max(tGv,tGps,tYpf,1);
   const cnt = k => rs.filter(r=>r.nivel===k).length;
@@ -701,7 +834,7 @@ function renderMatriz(){
     <tbody>${doms.map(d=>`<tr><td class="rowh">${esc(d)}</td>${meses.map(m=>{
       const r = porDom[d][m];
       if(!r) return `<td class="cell mute">·</td>`;
-      const txt = r.estado==="Imposible" ? "!" : r.estado==="Falta en Gestión"||r.estado==="Litros sin km" ? "0" : r.difGv!==null ? (Math.abs(r.difGv)>999 ? (r.difGv>0?"> +999":"< −999") : (r.difGv>0?"+":"")+fmt(r.difGv,0)) : "·";
+      const txt = r.estado==="Imposible" || r.excede ? "!" : r.estado==="Falta en Gestión"||r.estado==="Litros sin km" ? "0" : r.difGv!==null ? (Math.abs(r.difGv)>999 ? (r.difGv>0?"> +999":"< −999") : (r.difGv>0?"+":"")+fmt(r.difGv,0)) : "·";
       return `<td class="cell ${r.nivel}" data-d="${esc(d)}" data-m="${m}" title="${esc(r.estado+": "+r.motivo)}">${txt}</td>`;
     }).join("")}</tr>`).join("")}</tbody>
   </table></div>`;
@@ -709,6 +842,7 @@ function renderMatriz(){
 }
 
 const GRUPOS = [
+  {e:"Más de 15.000 km", d:"Registros de Gestión o GPS que superan 15.000 km en un mes. Son errores de carga y no se usan en los totales."},
   {e:"Imposible", d:"Km de Gestión que no pueden ser reales para los litros cargados. Suele ser el odómetro cargado como km."},
   {e:"Litros sin km", d:"Gestión tiene litros cargados pero 0 km: el km no se cargó o la celda vino como texto."},
   {e:"Falta en Gestión", d:"El GPS o el odómetro registran recorrido y Gestión no tiene el mes."},
@@ -886,8 +1020,12 @@ async function iniciar(){
       auth: { persistSession:false, autoRefreshToken:false, detectSessionInUrl:false },
       global: { fetch: fetchCompatible }
     });
-    const raw = await cargarTodo();
-    try { localStorage.setItem(LS_DATA, JSON.stringify({ t: Date.now(), rows: raw })); } catch(err){ /* sin espacio: se sigue sin copia local */ }
+    const [raw, saltos] = await Promise.all([
+      cargarTodo(),
+      cargarSaltosYpf().catch(err => { console.error("Saltos YPF:", err); state.ypfError = String(err.message||err); return null; })
+    ]);
+    if(saltos){ state.ypfSaltos = saltos; state.ypfError = null; }
+    try { localStorage.setItem(LS_DATA, JSON.stringify({ t: Date.now(), rows: raw, saltos: state.ypfSaltos })); } catch(err){ /* sin espacio: se sigue sin copia local */ }
     $("#offline")?.remove();
     preparar(raw);
     setConn("ok", `Actualizado ${new Date().toLocaleString("es-AR",{dateStyle:"short",timeStyle:"short"})}`);
@@ -902,6 +1040,7 @@ async function iniciar(){
     let copia = null;
     try { copia = JSON.parse(localStorage.getItem(LS_DATA) || "null"); } catch(err){}
     if(copia && copia.rows && copia.rows.length){
+      state.ypfSaltos = copia.saltos || [];
       preparar(copia.rows);
       const cuando = new Date(copia.t).toLocaleString("es-AR",{dateStyle:"short",timeStyle:"short"});
       setConn("err", `Datos del ${cuando}`);

@@ -4,7 +4,7 @@
    - Librerías y tipografías de CDN se sirven desde caché y se actualizan en segundo plano.
    - Las consultas a Supabase nunca se guardan acá: la app guarda su propia copia de los últimos datos.
    Al publicar cambios grandes, subí el número de VERSION. */
-const VERSION = "auditoria-km-v6";
+const VERSION = "auditoria-km-v7";
 const SHELL = [
   "./", "./index.html", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png", "./icons/favicon-64.png"
